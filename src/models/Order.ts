@@ -7,6 +7,9 @@ export interface OrderItem {
 }
 
 export interface Order {
+  cancelledBy: string;
+  cancelledAt: any;
+  cancellationReason: any;
   id: string;
   orderNumber: string;
   auxiliaryId: string;

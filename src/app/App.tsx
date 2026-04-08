@@ -10,13 +10,10 @@ import { SuppliersView } from '@/views/fournisseurs';
 import { HomeView } from '@/views/HomeView';
 import { LoginView } from '@/views/LoginView';
 import { MedicinesView } from '@/views/MedicinesView';
+import { SalesView } from '@/views/SalesView';
+import { UsersView } from '@/views/UsersView';
 import { Sidebar } from './components/Sidebar';
 import { BonLivraisonView } from '@/views/bonLivraisonView';
-import { SalesView } from '@/views/SalesView';
-import { SettingsView } from '@/views/SettingsView';
-import { StockAlertsView } from '@/views/StockAlertsView';
-import { UsersView } from '@/views/UsersView';
-import { Header } from './components/Header';
 
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -24,7 +21,7 @@ function App() {
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
-    setCurrentPage('home'); // Rediriger vers la page d'accueil après connexion
+    setCurrentPage('home');
   };
 
   const handleLogout = () => {
@@ -62,43 +59,31 @@ function App() {
 
   // Pour les autres pages, afficher avec Sidebar
   return (
-  <>
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar 
-        activePage={currentPage}
-        onNavigate={handleNavigate}
-        onLogout={handleLogout}
-      />
-      
-      <div className="flex-1 flex flex-col">
-
-        <Header 
-        user={currentUser} 
-        currentPage={currentPage} 
-        
+    <>
+      <div className="flex h-screen overflow-hidden">
+        <Sidebar 
+          activePage={currentPage}
+          onNavigate={handleNavigate}
+          onLogout={handleLogout}
         />
-
-        {/* CONTENU */}
-        <main className="flex-1 overflow-y-auto">
+        
+        <main className="flex-1 overflow-y-auto bg-gray-50">
           {currentPage === 'dashboard' && <DashboardView />}
           {currentPage === 'medicines' && <MedicinesView currentUser={currentUser} />}
           {currentPage === 'clients' && <ClientsView currentUser={currentUser} />}
           {currentPage === 'fournisseurs' && <SuppliersView currentUser={currentUser} />}
+          {currentPage === 'bonsLivraison' && <BonLivraisonView currentUser={currentUser} />}
           {currentPage === 'sales' && <SalesView currentUser={currentUser} />}
           {currentPage === 'auxiliaire' && <AuxiliaireView currentUser={currentUser} />}
           {currentPage === 'caisse' && <CaisseView currentUser={currentUser} />}
-          {currentPage === 'alerts' && <StockAlertsView currentUser={currentUser} />}
-          {currentPage === 'bonsLivraisons' && <BonLivraisonView currentUser={currentUser} />}
+          {currentPage === 'alerts' && <div className="p-8">Page Alertes (à implémenter)</div>}
           {currentPage === 'users' && <UsersView currentUser={currentUser} />}
-          {currentPage === 'settings' && <SettingsView currentUser={currentUser} />}
+          {currentPage === 'settings' && <div className="p-8">Page Paramètres (à implémenter)</div>}
         </main>
-
       </div>
-    </div>
-    <Toaster position="top-right" />
-  </>
-);
-
+      <Toaster position="top-right" />
+    </>
+  );
 }
 
 export default App;
