@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { 
-  Search, Plus, Edit, Trash2, Eye, X, Phone, Mail, MapPin, 
-  Calendar, User as UserIcon, Shield, ShieldOff, TrendingUp, 
-  ShoppingBag, DollarSign, Clock, AlertCircle, Activity, FileText
+import {
+  Search, Plus, Edit, Trash2, Eye, X, Phone, Mail, MapPin,
+  Calendar, User as UserIcon, Shield, ShieldOff, TrendingUp,
+  ShoppingBag, DollarSign, Clock, AlertCircle, Activity, FileText,
+  Stethoscope
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/app/components/ui/button';
@@ -55,7 +56,19 @@ export function ClientsView({ currentUser }: ClientsViewProps) {
     allergies: [] as string[],
     chronicDiseases: [] as string[],
     notes: '',
-    status: 'Actif' as Client['status']
+    creditBalance: '' as string | number,
+    creditAlertThreshold: '' as string | number,
+    status: 'Actif' as Client['status'],
+    hasPrescriber: false,
+    prescriber: {
+      name: '',
+      specialty: '',
+      phone: '',
+      email: '',
+      registrationNumber: '',
+      clinicName: '',
+      address: ''
+    }
   });
 
   const [allergyInput, setAllergyInput] = useState('');
@@ -131,7 +144,19 @@ export function ClientsView({ currentUser }: ClientsViewProps) {
       allergies: [],
       chronicDiseases: [],
       notes: '',
-      status: 'Actif'
+      creditBalance: '',
+      creditAlertThreshold: '',
+      status: 'Actif',
+      hasPrescriber: false,
+      prescriber: {
+        name: '',
+        specialty: '',
+        phone: '',
+        email: '',
+        registrationNumber: '',
+        clinicName: '',
+        address: ''
+      }
     });
     setAllergyInput('');
     setDiseaseInput('');
@@ -169,8 +194,19 @@ export function ClientsView({ currentUser }: ClientsViewProps) {
       allergies: formData.allergies.length > 0 ? formData.allergies : undefined,
       chronicDiseases: formData.chronicDiseases.length > 0 ? formData.chronicDiseases : undefined,
       notes: formData.notes || undefined,
+      creditBalance: formData.creditBalance !== '' ? Number(formData.creditBalance) : undefined,
+      creditAlertThreshold: formData.creditAlertThreshold !== '' ? Number(formData.creditAlertThreshold) : undefined,
       status: formData.status,
-      createdBy: currentUser?.fullName
+      createdBy: currentUser?.fullName,
+      prescriber: formData.hasPrescriber && formData.prescriber.name ? {
+        name: formData.prescriber.name,
+        specialty: formData.prescriber.specialty || undefined,
+        phone: formData.prescriber.phone || undefined,
+        email: formData.prescriber.email || undefined,
+        registrationNumber: formData.prescriber.registrationNumber || undefined,
+        clinicName: formData.prescriber.clinicName || undefined,
+        address: formData.prescriber.address || undefined,
+      } : undefined
     };
 
     if (viewMode === 'add') {
@@ -214,7 +250,27 @@ export function ClientsView({ currentUser }: ClientsViewProps) {
       allergies: client.allergies || [],
       chronicDiseases: client.chronicDiseases || [],
       notes: client.notes || '',
-      status: client.status
+      creditBalance: client.creditBalance ?? '',
+      creditAlertThreshold: client.creditAlertThreshold ?? '',
+      status: client.status,
+      hasPrescriber: !!client.prescriber,
+      prescriber: client.prescriber ? {
+        name: client.prescriber.name,
+        specialty: client.prescriber.specialty || '',
+        phone: client.prescriber.phone || '',
+        email: client.prescriber.email || '',
+        registrationNumber: client.prescriber.registrationNumber || '',
+        clinicName: client.prescriber.clinicName || '',
+        address: client.prescriber.address || ''
+      } : {
+        name: '',
+        specialty: '',
+        phone: '',
+        email: '',
+        registrationNumber: '',
+        clinicName: '',
+        address: ''
+      }
     });
     setViewMode('edit');
   };
@@ -746,6 +802,145 @@ export function ClientsView({ currentUser }: ClientsViewProps) {
               </div>
             </div>
 
+            {/* Médecin prescripteur */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Stethoscope className="w-5 h-5 text-teal-600" />
+                Médecin prescripteur
+              </h3>
+
+              <div className="mb-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.hasPrescriber}
+                    onChange={(e) => setFormData({ ...formData, hasPrescriber: e.target.checked })}
+                    className="w-5 h-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                  />
+                  <span className="text-sm font-medium text-gray-900">
+                    Ce client a un médecin prescripteur
+                  </span>
+                </label>
+              </div>
+
+              <AnimatePresence>
+                {formData.hasPrescriber && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="grid grid-cols-2 gap-4"
+                  >
+                    <div>
+                      <Label htmlFor="prescriberName">Nom du médecin *</Label>
+                      <Input
+                        id="prescriberName"
+                        value={formData.prescriber.name}
+                        onChange={(e) => setFormData({ ...formData, prescriber: { ...formData.prescriber, name: e.target.value } })}
+                        placeholder="Dr. Jean Ouédraogo"
+                        className="mt-2"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="prescriberSpecialty">Spécialité</Label>
+                      <Input
+                        id="prescriberSpecialty"
+                        value={formData.prescriber.specialty}
+                        onChange={(e) => setFormData({ ...formData, prescriber: { ...formData.prescriber, specialty: e.target.value } })}
+                        placeholder="Ex: Cardiologue, Généraliste..."
+                        className="mt-2"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="prescriberPhone">Téléphone</Label>
+                      <Input
+                        id="prescriberPhone"
+                        value={formData.prescriber.phone}
+                        onChange={(e) => setFormData({ ...formData, prescriber: { ...formData.prescriber, phone: e.target.value } })}
+                        placeholder="+226 70 00 00 00"
+                        className="mt-2"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="prescriberEmail">Email</Label>
+                      <Input
+                        id="prescriberEmail"
+                        type="email"
+                        value={formData.prescriber.email}
+                        onChange={(e) => setFormData({ ...formData, prescriber: { ...formData.prescriber, email: e.target.value } })}
+                        placeholder="dr.jean@clinique.bf"
+                        className="mt-2"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="prescriberReg">N° RPPS / Ordre</Label>
+                      <Input
+                        id="prescriberReg"
+                        value={formData.prescriber.registrationNumber}
+                        onChange={(e) => setFormData({ ...formData, prescriber: { ...formData.prescriber, registrationNumber: e.target.value } })}
+                        placeholder="Ex: RPPS123456789"
+                        className="mt-2"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="prescriberClinic">Cabinet / Clinique</Label>
+                      <Input
+                        id="prescriberClinic"
+                        value={formData.prescriber.clinicName}
+                        onChange={(e) => setFormData({ ...formData, prescriber: { ...formData.prescriber, clinicName: e.target.value } })}
+                        placeholder="Ex: Clinique du Plateau"
+                        className="mt-2"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Label htmlFor="prescriberAddress">Adresse du cabinet</Label>
+                      <Input
+                        id="prescriberAddress"
+                        value={formData.prescriber.address}
+                        onChange={(e) => setFormData({ ...formData, prescriber: { ...formData.prescriber, address: e.target.value } })}
+                        placeholder="Ex: Avenue de la Nation, Ouagadougou"
+                        className="mt-2"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Avoir (crédit en pharmacie) */}
+            <div className="border border-dashed border-teal-200 rounded-lg p-4 bg-teal-50/40 space-y-3">
+              <p className="text-sm font-semibold text-teal-700">Avoir en pharmacie (solde crédit)</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="creditBalance" className="text-xs">Solde avoir (FCFA)</Label>
+                  <Input
+                    id="creditBalance"
+                    type="number"
+                    min="0"
+                    step="100"
+                    value={formData.creditBalance}
+                    onChange={e => setFormData({ ...formData, creditBalance: e.target.value })}
+                    placeholder="0"
+                    className="mt-1 bg-white"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="creditAlertThreshold" className="text-xs">Seuil d'alerte (FCFA)</Label>
+                  <Input
+                    id="creditAlertThreshold"
+                    type="number"
+                    min="0"
+                    step="100"
+                    value={formData.creditAlertThreshold}
+                    onChange={e => setFormData({ ...formData, creditAlertThreshold: e.target.value })}
+                    placeholder="5000"
+                    className="mt-1 bg-white"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Alerte si solde passe en dessous</p>
+                </div>
+              </div>
+            </div>
+
             {/* Notes */}
             <div>
               <Label htmlFor="notes">Notes</Label>
@@ -1063,6 +1258,45 @@ export function ClientsView({ currentUser }: ClientsViewProps) {
                 <div className="mt-6 pt-6 border-t border-gray-200">
                   <h4 className="text-sm font-semibold text-gray-900 mb-2">Notes</h4>
                   <p className="text-sm text-gray-600">{selectedClient.notes}</p>
+                </div>
+              )}
+
+              {selectedClient.prescriber && (
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <Stethoscope className="w-4 h-4 text-teal-600" />
+                    Médecin prescripteur
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <p className="font-medium text-gray-900">{selectedClient.prescriber.name}</p>
+                    {selectedClient.prescriber.specialty && (
+                      <p className="text-gray-500 italic">{selectedClient.prescriber.specialty}</p>
+                    )}
+                    {selectedClient.prescriber.clinicName && (
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <MapPin className="w-3.5 h-3.5 shrink-0" />
+                        <span>{selectedClient.prescriber.clinicName}</span>
+                      </div>
+                    )}
+                    {selectedClient.prescriber.address && (
+                      <p className="text-gray-500 text-xs">{selectedClient.prescriber.address}</p>
+                    )}
+                    {selectedClient.prescriber.phone && (
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <Phone className="w-3.5 h-3.5 shrink-0" />
+                        <span>{selectedClient.prescriber.phone}</span>
+                      </div>
+                    )}
+                    {selectedClient.prescriber.email && (
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <Mail className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{selectedClient.prescriber.email}</span>
+                      </div>
+                    )}
+                    {selectedClient.prescriber.registrationNumber && (
+                      <p className="text-xs text-gray-400">N° {selectedClient.prescriber.registrationNumber}</p>
+                    )}
+                  </div>
                 </div>
               )}
             </motion.div>

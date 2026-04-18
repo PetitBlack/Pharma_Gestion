@@ -6,7 +6,8 @@ export interface User {
   fullName: string;
   email: string;
   createdAt: string;
-  workstation?: string; // Identifiant du poste pour les auxiliaires
+  workstation?: string;
+  allowedModules?: string[]; // Modules visibles (undefined = tous les modules du rôle)
 }
 
 export type UserRole = 'Admin' | 'Employee' | 'Auxiliaire' | 'Caisse';

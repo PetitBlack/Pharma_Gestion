@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { 
-  Plus, Edit, Trash2, User as UserIcon, Shield, Briefcase, 
+import {
+  Plus, Edit, Trash2, User as UserIcon, Shield, Briefcase,
   X, Eye, EyeOff, AlertTriangle, LayoutDashboard, Pill,
   ShoppingCart, Users, Settings, Building2, ClipboardList,
-  CreditCard, CheckCircle, Package
+  CreditCard, CheckCircle, Package, Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/app/components/ui/button';
@@ -21,36 +21,39 @@ interface UsersViewProps {
 
 type ViewMode = 'list' | 'add' | 'edit';
 
-// Configuration des modules par rôle
-const MODULE_CONFIG = {
-  'Admin': [
-    { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
-    { id: 'medicines', label: 'Médicaments', icon: Pill },
-    { id: 'clients', label: 'Clients', icon: UserIcon },
-    { id: 'fournisseurs', label: 'Fournisseurs', icon: Building2 },
-    { id: 'bons-livraison', label: 'Bons de Livraison', icon: ClipboardList },
-    { id: 'sales', label: 'Ventes', icon: ShoppingCart },
-    { id: 'auxiliaire', label: 'Point de Vente', icon: ClipboardList },
-    { id: 'caisse', label: 'Caisse', icon: CreditCard },
-    { id: 'alerts', label: 'Alertes Stock', icon: AlertTriangle },
-    { id: 'users', label: 'Utilisateurs', icon: Users },
-    { id: 'settings', label: 'Paramètres', icon: Settings },
-  ],
-  'Employee': [
-    { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
-    { id: 'medicines', label: 'Médicaments', icon: Pill },
-    { id: 'clients', label: 'Clients', icon: UserIcon },
-    { id: 'fournisseurs', label: 'Fournisseurs', icon: Building2 },
-    { id: 'bons-livraison', label: 'Bons de Livraison', icon: ClipboardList },
-    { id: 'sales', label: 'Ventes', icon: ShoppingCart },
-    { id: 'alerts', label: 'Alertes Stock', icon: AlertTriangle },
-  ],
-  'Auxiliaire': [
-    { id: 'auxiliaire', label: 'Point de Vente', icon: ClipboardList },
-  ],
-  'Caisse': [
-    { id: 'caisse', label: 'Caisse', icon: CreditCard },
-  ],
+// Tous les modules disponibles pour la sélection
+const ALL_MODULES = [
+  { id: 'dashboard',     label: 'Tableau de bord',  icon: LayoutDashboard },
+  { id: 'medicines',     label: 'Médicaments',       icon: Pill },
+  { id: 'clients',       label: 'Clients',           icon: UserIcon },
+  { id: 'fournisseurs',  label: 'Fournisseurs',      icon: Building2 },
+  { id: 'bonsLivraison', label: 'Bons de Livraison', icon: ClipboardList },
+  { id: 'sales',         label: 'Ventes',            icon: ShoppingCart },
+  { id: 'auxiliaire',    label: 'Point de Vente',    icon: ClipboardList },
+  { id: 'caisse',        label: 'Caisse',            icon: CreditCard },
+  { id: 'alerts',        label: 'Alertes Stock',     icon: AlertTriangle },
+];
+
+// Modules Admin (fixes, non modifiables)
+const ADMIN_MODULES = [
+  ...ALL_MODULES,
+  { id: 'users',    label: 'Utilisateurs', icon: Users },
+  { id: 'settings', label: 'Paramètres',   icon: Settings },
+];
+
+// Modules cochés par défaut selon le rôle
+const DEFAULT_MODULES: Record<string, string[]> = {
+  Employee:   ['dashboard', 'medicines', 'clients', 'fournisseurs', 'bonsLivraison', 'sales', 'alerts'],
+  Auxiliaire: ['auxiliaire'],
+  Caisse:     ['caisse'],
+};
+
+// Pour la carte liste — modules affichés
+const MODULE_CONFIG: Record<string, typeof ALL_MODULES> = {
+  Admin:      ADMIN_MODULES,
+  Employee:   ALL_MODULES.filter(m => DEFAULT_MODULES.Employee.includes(m.id)),
+  Auxiliaire: ALL_MODULES.filter(m => DEFAULT_MODULES.Auxiliaire.includes(m.id)),
+  Caisse:     ALL_MODULES.filter(m => DEFAULT_MODULES.Caisse.includes(m.id)),
 };
 
 export function UsersView({ currentUser }: UsersViewProps) {
@@ -67,8 +70,26 @@ export function UsersView({ currentUser }: UsersViewProps) {
     fullName: '',
     email: '',
     role: 'Employee' as UserRole,
-    workstation: ''
+    workstation: '',
+    allowedModules: DEFAULT_MODULES['Employee'] as string[],
   });
+
+  const handleRoleChange = (value: UserRole) => {
+    setFormData(prev => ({
+      ...prev,
+      role: value,
+      allowedModules: DEFAULT_MODULES[value] ?? [],
+    }));
+  };
+
+  const toggleModule = (moduleId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      allowedModules: prev.allowedModules.includes(moduleId)
+        ? prev.allowedModules.filter(id => id !== moduleId)
+        : [...prev.allowedModules, moduleId],
+    }));
+  };
 
   useEffect(() => {
     loadUsers();
@@ -84,7 +105,10 @@ export function UsersView({ currentUser }: UsersViewProps) {
       return;
     }
 
-    userService.add(formData);
+    userService.add({
+      ...formData,
+      allowedModules: formData.role === 'Admin' ? undefined : formData.allowedModules,
+    });
     toast.success('Utilisateur ajouté avec succès');
     resetForm();
     setViewMode('list');
@@ -95,11 +119,12 @@ export function UsersView({ currentUser }: UsersViewProps) {
     setSelectedUser(user);
     setFormData({
       username: user.username,
-      password: '', // On ne pré-remplit pas le mot de passe
+      password: '',
       fullName: user.fullName,
       email: user.email || '',
       role: user.role,
-      workstation: user.workstation || ''
+      workstation: user.workstation || '',
+      allowedModules: user.allowedModules ?? DEFAULT_MODULES[user.role] ?? [],
     });
     setViewMode('edit');
   };
@@ -116,7 +141,8 @@ export function UsersView({ currentUser }: UsersViewProps) {
       fullName: formData.fullName,
       email: formData.email || undefined,
       role: formData.role,
-      workstation: formData.workstation || undefined
+      workstation: formData.workstation || undefined,
+      allowedModules: formData.role === 'Admin' ? undefined : formData.allowedModules,
     };
 
     // Mettre à jour le mot de passe seulement s'il est fourni
@@ -157,7 +183,8 @@ export function UsersView({ currentUser }: UsersViewProps) {
       fullName: '',
       email: '',
       role: 'Employee',
-      workstation: ''
+      workstation: '',
+      allowedModules: DEFAULT_MODULES['Employee'],
     });
     setSelectedUser(null);
     setShowPassword(false);
@@ -364,7 +391,6 @@ export function UsersView({ currentUser }: UsersViewProps) {
   }
 
   // Vue Ajout/Édition
-  const modules = MODULE_CONFIG[formData.role] || [];
 
   return (
     <div className="p-8 bg-gray-50 min-h-screen">
@@ -456,9 +482,9 @@ export function UsersView({ currentUser }: UsersViewProps) {
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <Label htmlFor="role">Rôle *</Label>
-                <Select 
-                  value={formData.role} 
-                  onValueChange={(value: UserRole) => setFormData({ ...formData, role: value })}
+                <Select
+                  value={formData.role}
+                  onValueChange={(value: UserRole) => handleRoleChange(value)}
                 >
                   <SelectTrigger className="mt-2">
                     <SelectValue />
@@ -509,31 +535,73 @@ export function UsersView({ currentUser }: UsersViewProps) {
 
           {/* Modules accessibles */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Modules accessibles ({modules.length})
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Ce rôle aura accès aux modules suivants :
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">Modules visibles</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              {formData.role === 'Admin'
+                ? 'Les administrateurs ont accès à tous les modules par défaut.'
+                : 'Sélectionnez les modules visibles pour cet utilisateur.'}
             </p>
-            <div className="grid grid-cols-2 gap-3">
-              {modules.map((module) => {
-                const ModuleIcon = module.icon;
-                return (
-                  <div
-                    key={module.id}
-                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200"
-                  >
-                    <div className="w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center">
-                      <ModuleIcon className="w-4 h-4 text-teal-600" />
+
+            {formData.role === 'Admin' ? (
+              /* Admin — tous les modules verrouillés */
+              <div className="grid grid-cols-2 gap-2">
+                {ADMIN_MODULES.map((module) => {
+                  const ModuleIcon = module.icon;
+                  return (
+                    <div
+                      key={module.id}
+                      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 opacity-80"
+                    >
+                      <div className="w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center shrink-0">
+                        <ModuleIcon className="w-4 h-4 text-teal-600" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-700 flex-1">{module.label}</span>
+                      <Lock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{module.label}</p>
-                    </div>
-                    <CheckCircle className="w-4 h-4 text-green-600 ml-auto" />
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Autres rôles — checkboxes */
+              <div className="grid grid-cols-2 gap-2">
+                {ALL_MODULES.map((module) => {
+                  const ModuleIcon = module.icon;
+                  const isChecked = formData.allowedModules.includes(module.id);
+                  return (
+                    <button
+                      key={module.id}
+                      type="button"
+                      onClick={() => toggleModule(module.id)}
+                      className={`flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-all ${
+                        isChecked
+                          ? 'border-teal-500 bg-teal-50'
+                          : 'border-gray-200 bg-white hover:border-gray-300'
+                      }`}
+                    >
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                        isChecked ? 'bg-teal-100' : 'bg-gray-100'
+                      }`}>
+                        <ModuleIcon className={`w-4 h-4 ${isChecked ? 'text-teal-600' : 'text-gray-400'}`} />
+                      </div>
+                      <span className={`text-sm font-medium flex-1 ${isChecked ? 'text-teal-800' : 'text-gray-600'}`}>
+                        {module.label}
+                      </span>
+                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${
+                        isChecked ? 'bg-teal-500 border-teal-500' : 'border-gray-300'
+                      }`}>
+                        {isChecked && <CheckCircle className="w-3 h-3 text-white" strokeWidth={3} />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {formData.role !== 'Admin' && (
+              <p className="text-xs text-gray-400 mt-3">
+                {formData.allowedModules.length} module{formData.allowedModules.length > 1 ? 's' : ''} sélectionné{formData.allowedModules.length > 1 ? 's' : ''}
+              </p>
+            )}
           </div>
         </div>
 

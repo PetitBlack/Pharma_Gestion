@@ -3,7 +3,9 @@ export interface OrderItem {
   medicineName: string;
   quantity: number;
   price: number;
-  total: number;
+  total: number;           // montant final (après remise)
+  discount?: number;       // remise en % (0–100)
+  prescriptionId?: string; // référence à l'ordonnancier
 }
 
 export interface Order {
@@ -23,6 +25,10 @@ export interface Order {
   paidAt?: string;
   cashierId?: string;
   cashierName?: string;
+
+  // Tiers payant (assurance / mutuelle)
+  insuranceCompany?: string;   // Nom de la compagnie
+  insuranceCoverage?: number;  // Montant pris en charge par l'assurance
 }
 
 export type OrderStatus = 'En attente' | 'Payée' | 'Annulée';

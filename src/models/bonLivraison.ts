@@ -1,12 +1,47 @@
 export interface BonLivraisonItem {
   medicineId: string;
   medicineName: string;
-  quantityOrdered: number; // Quantité commandée
-  quantityReceived: number; // Quantité réellement reçue
+  quantityOrdered: number;
+  quantityReceived: number;
+  unitPrice: number;             // Prix grossiste (prix d'achat)
+  sellingPrice?: number;         // Prix de vente client calculé
+  taxRate?: number;              // Taux de taxe en % (ex: 18 pour TVA)
+  taxAmount?: number;            // Montant taxe calculé
+  batchNumber?: string;
+  expirationDate?: Date;
+  discrepancy?: number;
+  priceChanged?: boolean;        // Vrai si le prix de vente diffère du stock
+  previousSellingPrice?: number; // Ancien prix de vente en stock (référence)
+  currentStock?: number;         // Stock actuel au moment de la saisie
+}
+
+export type RetourReason = 'Périmé' | 'Endommagé' | 'Erreur de commande' | 'Qualité insuffisante' | 'Autre';
+
+export interface RetourItem {
+  medicineId: string;
+  medicineName: string;
+  quantity: number;
   unitPrice: number;
-  batchNumber?: string; // Numéro de lot
-  expirationDate?: Date; // Date d'expiration
-  discrepancy?: number; // Écart (reçu - commandé)
+  reason: RetourReason;
+  batchNumber?: string;
+  totalAmount: number;
+  notes?: string;
+}
+
+export interface RetourFournisseur {
+  id: string;
+  retourNumber: string;
+  blId?: string;
+  blNumber?: string;
+  supplierId?: string;
+  supplierName: string;
+  returnDate: string;
+  createdAt: string;
+  items: RetourItem[];
+  totalAmount: number;
+  status: 'En attente' | 'Envoyé' | 'Accepté' | 'Refusé';
+  notes?: string;
+  createdBy?: string;
 }
 
 export interface BonLivraison {

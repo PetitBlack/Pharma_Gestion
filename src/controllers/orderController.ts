@@ -94,7 +94,8 @@ export function useOrders() {
     orderId: string,
     paymentMethod: OrderPaymentMethod,
     cashierId: string,
-    cashierName: string
+    cashierName: string,
+    insuranceInfo?: { company: string; coverage: number }
   ): Order | null => {
     const orderIndex = orders.findIndex(o => o.id === orderId);
     if (orderIndex === -1) return null;
@@ -105,7 +106,11 @@ export function useOrders() {
       paymentMethod,
       cashierId,
       cashierName,
-      paidAt: new Date()
+      paidAt: new Date(),
+      ...(insuranceInfo ? {
+        insuranceCompany: insuranceInfo.company,
+        insuranceCoverage: insuranceInfo.coverage,
+      } : {})
     };
 
     const newOrders = [...orders];
@@ -146,6 +151,20 @@ export function useOrders() {
     return updatedOrder;
   };
 
+  // Rappel d'une commande "En attente" par l'auxiliaire — remet le stock et retourne les articles
+  const recallOrder = (
+    orderId: string,
+    userId?: string,
+    userName?: string
+  ): OrderItem[] | null => {
+    const order = orders.find(o => o.id === orderId && o.status === 'En attente');
+    if (!order) return null;
+
+    const items = order.items.map(i => ({ ...i })); // snapshot avant annulation
+    cancelOrder(orderId, userId, userName, 'Rappelée par auxiliaire');
+    return items;
+  };
+
   const getOrdersByAuxiliary = (auxiliaryId: string): Order[] => {
     return orders.filter(o => o.auxiliaryId === auxiliaryId);
   };
@@ -184,6 +203,7 @@ export function useOrders() {
     updateOrder,
     processPayment,
     cancelOrder,
+    recallOrder,
     getOrdersByAuxiliary,
     getOrdersByCashier,
     getOrdersByStatus,

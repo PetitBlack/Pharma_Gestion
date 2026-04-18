@@ -24,12 +24,27 @@ export interface Client {
   allergies?: string[];
   chronicDiseases?: string[];
   notes?: string;
+
+  // Médecin prescripteur
+  prescriber?: {
+    name: string;
+    specialty?: string;
+    phone?: string;
+    email?: string;
+    registrationNumber?: string; // Numéro RPPS / ordre
+    clinicName?: string;
+    address?: string;
+  };
   
   // Historique
   totalPurchases: number; // Nombre total d'achats
   totalSpent: number; // Montant total dépensé
   lastVisit?: Date;
   
+  // Avoir (crédit en pharmacie)
+  creditBalance?: number;          // Solde avoir en FCFA
+  creditAlertThreshold?: number;   // Seuil d'alerte (par défaut 5 000 FCFA)
+
   // Métadonnées
   createdAt: Date;
   updatedAt: Date;

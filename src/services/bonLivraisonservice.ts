@@ -1,4 +1,5 @@
 import { BLComparison, BonLivraison } from "@/models/bonLivraison";
+import { medicineService } from "@/services/medicineService";
 
 
 class BonLivraisonService {
@@ -102,6 +103,20 @@ class BonLivraisonService {
   }
 
   validate(id: string, validatedBy: string): BonLivraison | null {
+    const bl = this.getById(id);
+    if (bl) {
+      bl.items.forEach(item => {
+        // Mise à jour du stock
+        const med = medicineService.getById(item.medicineId);
+        if (med) {
+          medicineService.updateQuantity(item.medicineId, item.quantityReceived);
+          // Mise à jour du prix de vente si modifié
+          if (item.sellingPrice && item.priceChanged) {
+            medicineService.update(item.medicineId, { price: item.sellingPrice });
+          }
+        }
+      });
+    }
     return this.update(id, {
       status: 'Validé',
       validatedBy,

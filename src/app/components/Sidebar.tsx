@@ -1,10 +1,10 @@
-import { 
-  LayoutDashboard, 
-  Pill, 
-  ShoppingCart, 
-  AlertTriangle, 
-  Users, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Pill,
+  ShoppingCart,
+  AlertTriangle,
+  Users,
+  Settings,
   LogOut,
   ClipboardList,
   CreditCard,
@@ -13,7 +13,8 @@ import {
   Home,
   ChevronRight,
   ArrowLeft,
-  ArrowUpLeftFromCircle
+  ArrowUpLeftFromCircle,
+  BookOpen,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -135,7 +136,19 @@ export function Sidebar({ activePage, onNavigate, onLogout, currentUser }: Sideb
             { id: 'bonsLivraison', label: 'Liste BL', icon: ClipboardList, active: true },
           ]
         };
-      
+
+      case 'inventory':
+        return {
+          title: 'Inventaires',
+          subtitle: 'Comptages physiques',
+          icon: BookOpen,
+          color: 'from-indigo-500 to-indigo-600',
+          menuItems: [
+            { id: 'home', label: 'Accueil', icon: Home },
+            { id: 'inventory', label: 'Inventaires', icon: BookOpen, active: true },
+          ]
+        };
+
       case 'users':
         return {
           title: 'Utilisateurs',
@@ -174,7 +187,8 @@ export function Sidebar({ activePage, onNavigate, onLogout, currentUser }: Sideb
             { id: 'fournisseurs', label: 'Fournisseurs', icon: Building2 },
             { id: 'sales', label: 'Ventes', icon: ShoppingCart },
             { id: 'alerts', label: 'Alertes Stock', icon: AlertTriangle },
-            { id: 'bonsLivraison', label: 'Bons de livraison', icon: ClipboardList },
+            { id: 'bonsLivraison',   label: 'Bons de livraison',       icon: ClipboardList },
+            { id: 'inventory',       label: 'Inventaires',              icon: BookOpen },
             { id: 'users', label: 'Utilisateurs', icon: Users },
             { id: 'settings', label: 'Paramètres', icon: Settings },
           ]

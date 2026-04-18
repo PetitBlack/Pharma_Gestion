@@ -17,6 +17,10 @@ export default defineConfig({
     },
   },
   server: {
+    host: true,
     port: 3010,
+    allowedHosts: [
+      'unejective-debrah-precoracoid.ngrok-free.dev'
+    ],
   },
 })
