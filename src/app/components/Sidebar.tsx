@@ -15,6 +15,7 @@ import {
   ArrowLeft,
   ArrowUpLeftFromCircle,
   BookOpen,
+  ListOrdered,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -137,6 +138,18 @@ export function Sidebar({ activePage, onNavigate, onLogout, currentUser }: Sideb
           ]
         };
 
+      case 'orderSuggestions':
+        return {
+          title: 'Suggestions commande',
+          subtitle: 'Analyse des ventes',
+          icon: ListOrdered,
+          color: 'from-violet-500 to-violet-600',
+          menuItems: [
+            { id: 'home', label: 'Accueil', icon: Home },
+            { id: 'orderSuggestions', label: 'Suggestions', icon: ListOrdered, active: true },
+          ]
+        };
+
       case 'inventory':
         return {
           title: 'Inventaires',
@@ -187,8 +200,9 @@ export function Sidebar({ activePage, onNavigate, onLogout, currentUser }: Sideb
             { id: 'fournisseurs', label: 'Fournisseurs', icon: Building2 },
             { id: 'sales', label: 'Ventes', icon: ShoppingCart },
             { id: 'alerts', label: 'Alertes Stock', icon: AlertTriangle },
-            { id: 'bonsLivraison',   label: 'Bons de livraison',       icon: ClipboardList },
-            { id: 'inventory',       label: 'Inventaires',              icon: BookOpen },
+            { id: 'bonsLivraison',      label: 'Bons de livraison',       icon: ClipboardList },
+            { id: 'orderSuggestions', label: 'Suggestions commande',    icon: ListOrdered },
+            { id: 'inventory',        label: 'Inventaires',              icon: BookOpen },
             { id: 'users', label: 'Utilisateurs', icon: Users },
             { id: 'settings', label: 'Paramètres', icon: Settings },
           ]

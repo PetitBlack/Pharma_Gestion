@@ -4,12 +4,23 @@ import { mockMedicines } from './mockData';
 class MedicineService {
   private medicines: Medicine[] = [...mockMedicines];
 
+  /** Calcule la quantité réelle d'un médicament (détail = dérivée du parent). */
+  private computeQty(med: Medicine): Medicine {
+    if (med.packagingType === 'detail' && med.detailOf && med.detailSize) {
+      const parent = this.medicines.find(m => m.id === med.detailOf);
+      const computed = parent ? Math.floor(parent.quantity / med.detailSize) : 0;
+      return { ...med, quantity: computed };
+    }
+    return med;
+  }
+
   getAll(): Medicine[] {
-    return [...this.medicines];
+    return this.medicines.map(m => this.computeQty(m));
   }
 
   getById(id: string): Medicine | undefined {
-    return this.medicines.find(m => m.id === id);
+    const med = this.medicines.find(m => m.id === id);
+    return med ? this.computeQty(med) : undefined;
   }
 
   add(medicine: Omit<Medicine, 'id'>): Medicine {
@@ -38,7 +49,9 @@ class MedicineService {
   }
 
   getLowStock(threshold: number = 20): Medicine[] {
-    return this.medicines.filter(m => m.quantity < threshold);
+    return this.medicines
+      .map(m => this.computeQty(m))
+      .filter(m => m.quantity < threshold);
   }
 
   getExpiring(days: number = 90): Medicine[] {
@@ -61,11 +74,20 @@ class MedicineService {
     );
   }
 
-  updateQuantity(id: string, quantity: number): boolean {
+  updateQuantity(id: string, delta: number): boolean {
     const medicine = this.medicines.find(m => m.id === id);
     if (!medicine) return false;
-    
-    medicine.quantity += quantity;
+
+    if (medicine.packagingType === 'detail' && medicine.detailOf && medicine.detailSize) {
+      // Cascader la déduction sur le parent (en unités de base)
+      const parent = this.medicines.find(m => m.id === medicine.detailOf);
+      if (parent) {
+        parent.quantity += delta * medicine.detailSize;
+      }
+      // La quantité stockée du détail reste à 0 (calculée dynamiquement)
+    } else {
+      medicine.quantity += delta;
+    }
     return true;
   }
 }

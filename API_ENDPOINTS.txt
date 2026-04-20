@@ -1,0 +1,635 @@
+================================================================================
+              API REFERENCE — PHARMAA GEST BACKEND
+              BASE URL : http://localhost:3050/api
+================================================================================
+
+HEADERS REQUIS (toutes les routes protégées)
+─────────────────────────────────────────────
+  Authorization: Bearer <accessToken>
+  Content-Type: application/json
+
+Le accessToken dure 15 minutes.
+Pour le renouveler : POST /auth/refresh (cookie refreshToken httpOnly).
+
+
+================================================================================
+AUTH
+================================================================================
+
+POST   /auth/login
+  Body : { "username": "admin", "password": "Admin@1234" }
+  Auth : NON
+  Réponse :
+    {
+      "accessToken": "eyJ...",
+      "user": { "id", "username", "fullName", "role", "workstation", "allowedModules" }
+    }
+
+POST   /auth/logout
+  Body : —
+  Auth : OUI
+  Note : Supprime le refreshToken, efface le cookie.
+
+POST   /auth/refresh
+  Body : — (cookie refreshToken envoyé automatiquement)
+  Auth : NON
+  Réponse : { "accessToken": "eyJ..." }
+
+
+================================================================================
+USERS
+================================================================================
+Toutes les routes nécessitent un token.
+
+GET    /users
+  Auth : Admin
+  Desc : Liste tous les utilisateurs
+
+POST   /users
+  Auth : Admin
+  Body :
+    {
+      "username": "jean.dupont",
+      "password": "Pass@1234",
+      "fullName": "Jean Dupont",
+      "email": "jean@pharmacie.com",
+      "role": "Auxiliaire",
+      "workstation": "Poste 1",
+      "allowedModules": ["ventes", "stock"]
+    }
+  Rôles disponibles : Admin | Employee | Auxiliaire | Caisse
+
+PUT    /users/:id
+  Auth : Admin
+  Body : mêmes champs que POST (tous optionnels)
+
+DELETE /users/:id
+  Auth : Admin
+
+GET    /users/:id/activity
+  Auth : Admin
+  Desc : Journal d'activité d'un utilisateur
+
+GET    /users/:id/orders
+  Auth : Authentifié
+  Desc : Commandes liées à un utilisateur
+
+
+================================================================================
+MEDICINES
+================================================================================
+
+GET    /medicines
+  Auth : Authentifié
+  Filtres : ?category=&search=&status=
+  Desc : Liste tous les médicaments
+         (quantité virtuelle calculée pour les articles "detail")
+
+GET    /medicines/low-stock
+  Auth : Authentifié
+  Desc : Médicaments avec statut Low ou Negative
+
+GET    /medicines/expiring
+  Auth : Authentifié
+  Desc : Médicaments avec statut Expiring ou Expired
+
+GET    /medicines/:id
+  Auth : Authentifié
+  Desc : Détail d'un médicament
+
+POST   /medicines
+  Auth : Authentifié
+  Body :
+    {
+      "name": "Paracétamol 500mg",
+      "moleculeName": "Paracétamol",
+      "brandName": "Doliprane",
+      "category": "Analgésique",
+      "batchNumber": "LOT2024-001",
+      "expirationDate": "2026-12-31",
+      "quantity": 200,
+      "price": 500,
+      "description": "Antalgique",
+      "manufacturer": "Sanofi",
+      "location": "Rayon A - Étagère 2",
+      "requiresPrescription": false,
+      "minStock": 20,
+      "purchasePriceWholesale": 300,
+      "purchasePriceDetail": 350,
+      "profitMarginPct": 40,
+      "sellingPrice": 500,
+      "taxRate": 0,
+      "finalPrice": 500,
+      "packagingType": "standard",
+      "packSize": null,
+      "packLabel": null,
+      "detailSize": null,
+      "detailLabel": null,
+      "detailOfId": null
+    }
+  packagingType : standard | bulk | detail
+  Si detail → ajouter detailOfId (id du parent bulk) + detailSize (unités par unité détail)
+
+PUT    /medicines/:id
+  Auth : Authentifié
+  Body : mêmes champs que POST (tous optionnels)
+
+DELETE /medicines/:id
+  Auth : Admin
+
+PATCH  /medicines/:id/quantity
+  Auth : Authentifié
+  Body : { "quantity": 150, "reason": "Correction manuelle" }
+
+Statuts possibles (calculés automatiquement) :
+  OK | Low | Expiring | Expired | Negative
+
+
+================================================================================
+ORDERS (Point de vente)
+================================================================================
+
+GET    /orders
+  Auth : Authentifié
+  Filtres : ?status=&userId=&from=&to=
+  status : En_attente | Payee | Annulee
+
+GET    /orders/:id
+  Auth : Authentifié
+  Desc : Détail avec articles et médecins
+
+POST   /orders
+  Auth : Authentifié
+  Desc : Crée la commande et déduit le stock automatiquement
+         (gère le conditionnement detail → déduit du parent bulk)
+  Body :
+    {
+      "workstation": "Poste 1",
+      "clientId": 5,
+      "insuranceCompany": "CNAM",
+      "insuranceCoverage": 2000,
+      "items": [
+        {
+          "medicineId": 1,
+          "medicineName": "Paracétamol 500mg",
+          "quantity": 2,
+          "price": 500,
+          "discount": 10,
+          "prescriptionId": "ORD-001"
+        }
+      ]
+    }
+
+PATCH  /orders/:id/pay
+  Auth : Authentifié
+  Body : { "paymentMethod": "Especes", "cashierId": 3 }
+  paymentMethod : Especes | MobileMoney | Autre
+  Desc : Passe le statut à Payee, enregistre paidAt et cashierId
+
+PATCH  /orders/:id/cancel
+  Auth : Authentifié
+  Body : { "reason": "Erreur de saisie" }
+  Desc : Passe le statut à Annulee et restaure le stock
+
+
+================================================================================
+CLIENTS
+================================================================================
+
+GET    /clients
+  Auth : Authentifié
+  Filtres : ?search=&status=
+  status : Actif | Inactif
+
+GET    /clients/:id
+  Auth : Authentifié
+  Desc : Détail avec assurance et prescripteur
+
+POST   /clients
+  Auth : Authentifié
+  Body :
+    {
+      "firstName": "Ama",
+      "lastName": "Koffi",
+      "phone": "+229 97000000",
+      "email": "ama@email.com",
+      "address": "Rue 12",
+      "city": "Cotonou",
+      "dateOfBirth": "1985-03-15",
+      "gender": "Femme",
+      "isInsured": true,
+      "allergies": ["Pénicilline"],
+      "chronicDiseases": ["Diabète"],
+      "notes": "",
+      "creditBalance": 0,
+      "creditAlertThreshold": 5000,
+      "insurance": {
+        "company": "CNAM",
+        "policyNumber": "POL-001",
+        "coveragePercentage": 80,
+        "expiryDate": "2025-12-31",
+        "cardNumber": "CARD-001"
+      },
+      "prescriber": {
+        "name": "Dr. Kone",
+        "specialty": "Médecine générale",
+        "phone": "+229 96000000",
+        "email": "kone@clinique.com",
+        "registrationNumber": "RPPS-001",
+        "clinicName": "Clinique Centrale",
+        "address": "Rue des Médecins"
+      }
+    }
+  gender : Homme | Femme | Autre
+
+PUT    /clients/:id
+  Auth : Authentifié
+  Body : mêmes champs que POST (tous optionnels)
+
+DELETE /clients/:id
+  Auth : Authentifié
+
+GET    /clients/:id/purchases
+  Auth : Authentifié
+  Desc : Historique des commandes liées à ce client
+
+
+================================================================================
+SUPPLIERS (Fournisseurs)
+================================================================================
+
+GET    /suppliers
+  Auth : Authentifié
+  Filtres : ?status=&search=
+  status : Actif | Inactif | Suspendu
+
+GET    /suppliers/:id
+  Auth : Authentifié
+
+POST   /suppliers
+  Auth : Authentifié
+  Body :
+    {
+      "name": "PharmaDist",
+      "companyName": "PharmaDist SARL",
+      "email": "contact@pharmadist.com",
+      "phone": "+229 21000000",
+      "address": "Zone Industrielle",
+      "city": "Cotonou",
+      "country": "Bénin",
+      "taxId": "IFU-12345",
+      "paymentTerms": "30 jours",
+      "category": ["Médicaments", "Consommables"],
+      "rating": 4,
+      "notes": ""
+    }
+
+PUT    /suppliers/:id
+  Auth : Authentifié
+  Body : mêmes champs que POST (tous optionnels)
+
+DELETE /suppliers/:id
+  Auth : Authentifié
+
+GET    /suppliers/:id/orders
+  Auth : Authentifié
+  Desc : Commandes passées à ce fournisseur
+
+
+================================================================================
+SUPPLIER-ORDERS (Commandes fournisseurs)
+================================================================================
+
+GET    /supplier-orders
+  Auth : Authentifié
+  Filtres : ?status=&supplierId=
+  status : En_attente | Commande | Livre | Annule
+
+GET    /supplier-orders/:id
+  Auth : Authentifié
+
+POST   /supplier-orders
+  Auth : Authentifié
+  Body :
+    {
+      "supplierId": 1,
+      "deliveryDate": "2025-02-01",
+      "tax": 0,
+      "notes": "Commande urgente",
+      "items": [
+        {
+          "medicineId": 1,
+          "medicineName": "Paracétamol 500mg",
+          "quantity": 100,
+          "unitPrice": 300
+        }
+      ]
+    }
+
+PUT    /supplier-orders/:id
+  Auth : Authentifié
+  Body : champs modifiables (hors items)
+
+PATCH  /supplier-orders/:id/status
+  Auth : Authentifié
+  Body : { "status": "Commande" }
+
+
+================================================================================
+BONS DE LIVRAISON
+================================================================================
+
+GET    /bons-livraison
+  Auth : Authentifié
+  Filtres : ?status=&supplierId=
+  status : En_attente | Verifie | Valide | Litige | Archive
+
+GET    /bons-livraison/:id
+  Auth : Authentifié
+
+POST   /bons-livraison
+  Auth : Authentifié
+  Body :
+    {
+      "supplierId": 1,
+      "supplierOrderId": 2,
+      "deliveryDate": "2025-01-20",
+      "deliveryPerson": "M. Diallo",
+      "tax": 0,
+      "notes": "",
+      "discrepancyNotes": "",
+      "items": [
+        {
+          "medicineId": 1,
+          "medicineName": "Paracétamol 500mg",
+          "quantityOrdered": 100,
+          "quantityReceived": 98,
+          "unitPrice": 300,
+          "sellingPrice": 500,
+          "taxRate": 0,
+          "taxAmount": 0,
+          "batchNumber": "LOT2025-001",
+          "expirationDate": "2027-06-30",
+          "priceChanged": false,
+          "previousSellingPrice": 480,
+          "currentStock": 150
+        }
+      ]
+    }
+
+PATCH  /bons-livraison/:id/verify
+  Auth : Authentifié
+  Desc : Passe le statut à Verifie, enregistre verifiedBy + verifiedAt
+
+PATCH  /bons-livraison/:id/validate
+  Auth : Authentifié
+  Desc : Passe le statut à Valide, met à jour le stock de chaque médicament
+         (quantity += quantityReceived, màj batchNumber/expirationDate/sellingPrice si fournis)
+
+GET    /bons-livraison/:id/retours
+  Auth : Authentifié
+  Desc : Retours fournisseur liés à ce BL
+
+
+================================================================================
+RETOURS FOURNISSEUR
+================================================================================
+
+GET    /retours
+  Auth : Authentifié
+  Filtres : ?status=&supplierId=
+  status : En_attente | Envoye | Accepte | Refuse
+
+GET    /retours/:id
+  Auth : Authentifié
+
+POST   /retours
+  Auth : Authentifié
+  Body :
+    {
+      "supplierId": 1,
+      "blId": 3,
+      "returnDate": "2025-01-21",
+      "notes": "Produits endommagés",
+      "items": [
+        {
+          "medicineId": 1,
+          "medicineName": "Paracétamol 500mg",
+          "quantity": 2,
+          "unitPrice": 300,
+          "reason": "Endommage",
+          "batchNumber": "LOT2025-001",
+          "totalAmount": 600,
+          "notes": ""
+        }
+      ]
+    }
+  reason : Perime | Endommage | ErreurCommande | QualiteInsuffisante | Autre
+
+PATCH  /retours/:id/status
+  Auth : Authentifié
+  Body : { "status": "Envoye" }
+
+
+================================================================================
+INVENTAIRES
+================================================================================
+
+GET    /inventories
+  Auth : Authentifié
+  Desc : Liste de tous les inventaires
+
+GET    /inventories/:id
+  Auth : Authentifié
+  Desc : Détail avec tous les articles (snapshot stock)
+
+POST   /inventories
+  Auth : Authentifié
+  Desc : Crée un inventaire + snapshot automatique du stock actuel
+  Body : { "name": "Inventaire Janvier 2025", "notes": "Inventaire mensuel" }
+
+PATCH  /inventories/:id/items/:itemId
+  Auth : Authentifié
+  Desc : Saisir la quantité physique comptée pour un article
+  Body :
+    {
+      "physicalQty": 95,
+      "countedBy": "Jean Dupont",
+      "notes": "Compté le 20/01"
+    }
+
+PATCH  /inventories/:id/validate
+  Auth : Authentifié
+  Desc : Valide l'inventaire — corrige automatiquement les écarts de stock
+         (medicine.quantity = physicalQty pour chaque article avec discrepancy != 0)
+         Logge chaque ajustement dans activity_logs (action: stock_adjust)
+
+Statuts inventaire : En_cours | Termine | Valide
+
+
+================================================================================
+PRESCRIPTIONS (Ordonnancier)
+================================================================================
+
+GET    /prescriptions
+  Auth : Authentifié
+  Filtres : ?search=&from=&to=
+
+GET    /prescriptions/:id
+  Auth : Authentifié
+
+POST   /prescriptions
+  Auth : Authentifié
+  Body :
+    {
+      "patientName": "Ama Koffi",
+      "doctorName": "Dr. Kone",
+      "doctorRegistration": "RPPS-12345",
+      "prescriptionNumber": "ORD-2025-001",
+      "prescriptionDate": "2025-01-20",
+      "orderId": 5,
+      "notes": "Renouvellement mensuel",
+      "items": [
+        {
+          "medicineId": 1,
+          "medicineName": "Paracétamol 500mg",
+          "quantity": 2,
+          "dosage": "1 comprimé matin et soir"
+        }
+      ]
+    }
+
+PUT    /prescriptions/:id
+  Auth : Authentifié
+  Body : champs modifiables (hors items)
+
+
+================================================================================
+ACTIVITY LOGS
+================================================================================
+
+GET    /activity-logs
+  Auth : Admin
+  Filtres : ?action=&from=&to=&limit=100
+  action : medicine_add | medicine_edit | medicine_delete | medicine_price_change
+           | stock_adjust | sale_create | user_add | user_edit | user_delete | login
+
+GET    /activity-logs/user/:userId
+  Auth : Authentifié
+  Desc : Journal des 100 dernières actions d'un utilisateur
+
+
+================================================================================
+SETTINGS
+================================================================================
+
+GET    /settings
+  Auth : Authentifié
+  Desc : Lire les paramètres de la pharmacie
+
+PUT    /settings
+  Auth : Admin
+  Body :
+    {
+      "pharmacyName": "Pharmacie Centrale",
+      "address": "123 Rue de la Santé",
+      "city": "Cotonou",
+      "phone": "+229 21000000",
+      "email": "contact@pharmacie.com",
+      "license": "LIC-2024-001",
+      "openingHours": "Lun-Sam 8h-20h",
+      "lowStockThreshold": 15,
+      "expiryAlertDays": 30,
+      "currency": "FCFA",
+      "defaultMarginPct": 50,
+      "backupEnabled": true,
+      "backupFrequency": "Quotidien"
+    }
+  backupFrequency : Quotidien | Hebdomadaire | Mensuel
+
+
+================================================================================
+DASHBOARD
+================================================================================
+
+GET    /dashboard/stats
+  Auth : Authentifié
+  Filtres : ?from=&to=
+  Réponse :
+    {
+      "totalOrders": 150,
+      "paidOrders": 120,
+      "totalClients": 45,
+      "totalMedicines": 200,
+      "lowStockCount": 8,
+      "expiringCount": 3,
+      "revenue": 750000
+    }
+
+GET    /dashboard/top-medicines
+  Auth : Authentifié
+  Filtres : ?limit=10&from=&to=
+  Réponse : [{ "medicineId", "medicineName", "totalQty", "totalRevenue" }, ...]
+
+GET    /dashboard/top-sellers
+  Auth : Authentifié
+  Filtres : ?limit=10&from=&to=
+  Réponse : [{ "userId", "userName", "totalOrders", "totalRevenue" }, ...]
+
+
+================================================================================
+CODES DE RÉPONSE
+================================================================================
+
+200  OK            — Requête réussie
+201  Created       — Ressource créée
+400  Bad Request   — Champs manquants ou invalides
+401  Unauthorized  — Token manquant, invalide ou expiré
+403  Forbidden     — Rôle insuffisant
+404  Not Found     — Ressource introuvable
+409  Conflict      — Doublon (ex: username déjà utilisé)
+500  Server Error  — Erreur interne
+
+
+================================================================================
+NUMÉROTATION AUTOMATIQUE
+================================================================================
+
+  Commandes vente       : ORD-YYYY-NNNN  (ex: ORD-2025-0001)
+  Commandes fournisseur : CMD-YYYY-NNNN  (ex: CMD-2025-0001)
+  Bons de livraison     : BL-YYYY-NNNN   (ex: BL-2025-0001)
+  Retours fournisseur   : RET-YYYY-NNNN  (ex: RET-2025-0001)
+  Inventaires           : INV-YYYY-NNNN  (ex: INV-2025-0001)
+
+
+================================================================================
+COMPTE PAR DÉFAUT (après npm run db:seed)
+================================================================================
+
+  Username : admin
+  Password : Admin@1234
+  Rôle     : Admin
+
+
+================================================================================
+DÉMARRAGE RAPIDE
+================================================================================
+
+  # 1. Appliquer le schéma (première fois ou après reset)
+  npx prisma migrate reset --force
+  # OU si DB vierge :
+  npx prisma migrate dev --name init
+
+  # 2. Créer l'admin + settings par défaut
+  npm run db:seed
+
+  # 3. Démarrer en développement
+  npm run dev
+
+  # 4. Avec Docker (DB + API)
+  docker-compose up -d
+
+  Frontend (React) : http://localhost:5173
+  Backend (API)    : http://localhost:3050
+
+================================================================================

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Edit, Trash2, Package, MapPin, TrendingUp, DollarSign, AlertTriangle, ArrowLeft, Calculator, Info, History, FlaskConical } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Package, MapPin, TrendingUp, DollarSign, AlertTriangle, ArrowLeft, Calculator, Info, History, FlaskConical, Layers, Boxes } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
@@ -34,32 +34,40 @@ export function MedicinesView({ currentUser }: MedicinesViewProps) {
 
   const [formData, setFormData] = useState({
     name: '',
+    moleculeName: '',
     category: '',
     batchNumber: '',
     expirationDate: '',
     quantity: 0,
     purchasePriceWholesale: 0,
     purchasePriceDetail: 0,
-    profitMargin: 1.5,
+    profitMarginPct: 50,
     sellingPrice: 0,
     taxRate: 0,
     finalPrice: 0,
     manufacturer: '',
     location: '',
     description: '',
+    // Conditionnement
+    packagingType: 'standard' as 'standard' | 'bulk' | 'detail',
+    packSize: 0,
+    packLabel: '',
+    detailOf: '',
+    detailSize: 0,
+    detailLabel: '',
   });
 
   // Calcul automatique du prix de vente
   useEffect(() => {
     const basePrice = useWholesale ? formData.purchasePriceWholesale : formData.purchasePriceDetail;
-    const calculatedSellingPrice = basePrice * formData.profitMargin;
+    const calculatedSellingPrice = basePrice * (1 + formData.profitMarginPct / 100);
     const calculatedFinalPrice = calculatedSellingPrice * (1 + formData.taxRate / 100);
     setFormData(prev => ({
       ...prev,
       sellingPrice: parseFloat(calculatedSellingPrice.toFixed(2)),
       finalPrice: parseFloat(calculatedFinalPrice.toFixed(2))
     }));
-  }, [formData.purchasePriceWholesale, formData.purchasePriceDetail, formData.profitMargin, formData.taxRate, useWholesale]);
+  }, [formData.purchasePriceWholesale, formData.purchasePriceDetail, formData.profitMarginPct, formData.taxRate, useWholesale]);
 
   const filteredMedicines = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -93,10 +101,12 @@ export function MedicinesView({ currentUser }: MedicinesViewProps) {
 
   const resetForm = () => {
     setFormData({
-      name: '', category: '', batchNumber: '', expirationDate: '',
+      name: '', moleculeName: '', category: '', batchNumber: '', expirationDate: '',
       quantity: 0, purchasePriceWholesale: 0, purchasePriceDetail: 0,
-      profitMargin: 1.5, sellingPrice: 0, taxRate: 0, finalPrice: 0,
+      profitMarginPct: 50, sellingPrice: 0, taxRate: 0, finalPrice: 0,
       manufacturer: '', location: '', description: '',
+      packagingType: 'standard', packSize: 0, packLabel: '',
+      detailOf: '', detailSize: 0, detailLabel: '',
     });
     setUseWholesale(true);
   };
@@ -109,21 +119,34 @@ export function MedicinesView({ currentUser }: MedicinesViewProps) {
 
   const handleOpenEdit = (medicine: Medicine) => {
     setEditingMedicine(medicine);
+    // Convertir l'ancien coefficient multiplicateur (ex: 1.5) en pourcentage (ex: 50)
+    const rawMargin = (medicine as any).profitMarginPct ?? (medicine as any).profitMargin;
+    const profitMarginPct = rawMargin
+      ? rawMargin < 10 ? Math.round((rawMargin - 1) * 100) : rawMargin
+      : 50;
     setFormData({
       name: medicine.name,
+      moleculeName: medicine.moleculeName || '',
       category: medicine.category,
       batchNumber: medicine.batchNumber || '',
       expirationDate: medicine.expirationDate || '',
-      quantity: medicine.quantity,
+      // Pour les articles détail, la qty est calculée côté service – on affiche 0
+      quantity: medicine.packagingType === 'detail' ? 0 : medicine.quantity,
       purchasePriceWholesale: (medicine as any).purchasePriceWholesale || 0,
       purchasePriceDetail: (medicine as any).purchasePriceDetail || 0,
-      profitMargin: (medicine as any).profitMargin || 1.5,
+      profitMarginPct,
       sellingPrice: (medicine as any).sellingPrice || 0,
       taxRate: (medicine as any).taxRate || 0,
       finalPrice: (medicine as any).finalPrice || medicine.price || 0,
       manufacturer: medicine.manufacturer || '',
       location: medicine.location || '',
       description: medicine.description || '',
+      packagingType: medicine.packagingType || 'standard',
+      packSize: medicine.packSize || 0,
+      packLabel: medicine.packLabel || '',
+      detailOf: medicine.detailOf || '',
+      detailSize: medicine.detailSize || 0,
+      detailLabel: medicine.detailLabel || '',
     });
     setViewMode('edit');
   };
@@ -133,7 +156,17 @@ export function MedicinesView({ currentUser }: MedicinesViewProps) {
       toast.error('Veuillez remplir les champs obligatoires');
       return;
     }
-    const data = { ...formData, price: formData.finalPrice };
+    if (formData.packagingType === 'detail' && (!formData.detailOf || !formData.detailSize)) {
+      toast.error('Sélectionnez le produit parent et la taille de l\'unité détail');
+      return;
+    }
+    const data = {
+      ...formData,
+      price: formData.finalPrice || formData.sellingPrice,
+      moleculeName: formData.moleculeName.trim() || undefined,
+      // Les articles détail n'ont pas de qty stockée (calculée dynamiquement)
+      quantity: formData.packagingType === 'detail' ? 0 : formData.quantity,
+    };
     const status: Medicine['status'] =
       data.quantity < 0  ? 'Negative' :
       data.quantity < 20 ? 'Low'      : 'OK';
@@ -206,7 +239,6 @@ export function MedicinesView({ currentUser }: MedicinesViewProps) {
 
   const basePrice = useWholesale ? formData.purchasePriceWholesale : formData.purchasePriceDetail;
   const profitAmount = formData.sellingPrice - basePrice;
-  const profitPercentage = basePrice > 0 ? (profitAmount / basePrice) * 100 : 0;
 
   // ─── PAGE DÉTAIL ─────────────────────────────────────────────────────────
   if (viewMode === 'detail' && detailMedicine) {
@@ -287,7 +319,7 @@ export function MedicinesView({ currentUser }: MedicinesViewProps) {
                   <Input
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Ex: Paracétamol 500mg"
+                    placeholder="Ex: Doliprane 500mg"
                     className="mt-2 h-12 text-base"
                   />
                 </div>
@@ -297,6 +329,18 @@ export function MedicinesView({ currentUser }: MedicinesViewProps) {
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                     placeholder="Ex: Antalgique"
+                    className="mt-2 h-12 text-base"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-base font-semibold flex items-center gap-1.5">
+                    <FlaskConical className="w-4 h-4 text-purple-500" />
+                    Principe actif (DCI)
+                  </Label>
+                  <Input
+                    value={formData.moleculeName}
+                    onChange={(e) => setFormData({ ...formData, moleculeName: e.target.value })}
+                    placeholder="Ex: Paracétamol"
                     className="mt-2 h-12 text-base"
                   />
                 </div>
@@ -328,6 +372,147 @@ export function MedicinesView({ currentUser }: MedicinesViewProps) {
                   />
                 </div>
               </div>
+            </motion.div>
+
+            {/* ── Section 1.5 : Conditionnement ── */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.04 }}
+              className="bg-white rounded-xl border-2 border-gray-200 p-8 shadow-sm"
+            >
+              <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                <div className="p-2 bg-orange-100 rounded-lg">
+                  <Boxes className="w-6 h-6 text-orange-600" />
+                </div>
+                Conditionnement
+              </h3>
+
+              {/* Type de conditionnement */}
+              <div className="mb-6">
+                <Label className="text-base font-semibold mb-3 block">Type de conditionnement</Label>
+                <div className="grid grid-cols-3 gap-3">
+                  {([
+                    { value: 'standard', label: 'Standard', desc: 'Article vendu à l\'unité', icon: Package, color: 'teal' },
+                    { value: 'bulk',     label: 'Gros conditionnement', desc: 'Ex : boîte de 1 000', icon: Boxes, color: 'orange' },
+                    { value: 'detail',   label: 'Article détail', desc: 'Ex : plaquette de 10', icon: Layers, color: 'indigo' },
+                  ] as const).map(opt => {
+                    const Icon = opt.icon;
+                    const active = formData.packagingType === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, packagingType: opt.value })}
+                        className={`flex flex-col items-start gap-2 p-4 rounded-xl border-2 text-left transition-all ${
+                          active
+                            ? opt.color === 'teal'   ? 'border-teal-500 bg-teal-50'
+                            : opt.color === 'orange' ? 'border-orange-500 bg-orange-50'
+                            : 'border-indigo-500 bg-indigo-50'
+                            : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                      >
+                        <Icon className={`w-5 h-5 ${
+                          active
+                            ? opt.color === 'teal'   ? 'text-teal-600'
+                            : opt.color === 'orange' ? 'text-orange-600'
+                            : 'text-indigo-600'
+                            : 'text-gray-400'
+                        }`} />
+                        <div>
+                          <p className={`text-sm font-semibold ${active ? 'text-gray-900' : 'text-gray-600'}`}>{opt.label}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{opt.desc}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Champs Gros conditionnement */}
+              {formData.packagingType === 'bulk' && (
+                <div className="grid grid-cols-2 gap-6 p-4 bg-orange-50 rounded-xl border border-orange-200">
+                  <div>
+                    <Label className="text-base font-semibold">Unités de base par colis</Label>
+                    <p className="text-xs text-gray-500 mb-2">Ex : 1000 (gélules par boîte)</p>
+                    <Input
+                      type="number" min="1"
+                      value={formData.packSize || ''}
+                      onChange={(e) => setFormData({ ...formData, packSize: parseInt(e.target.value) || 0 })}
+                      placeholder="1000"
+                      className="h-12 text-base"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-base font-semibold">Libellé du colis</Label>
+                    <p className="text-xs text-gray-500 mb-2">Ex : boîte, carton, sachet</p>
+                    <Input
+                      value={formData.packLabel}
+                      onChange={(e) => setFormData({ ...formData, packLabel: e.target.value })}
+                      placeholder="boîte"
+                      className="h-12 text-base"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Champs Article détail */}
+              {formData.packagingType === 'detail' && (
+                <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-200 space-y-4">
+                  <div>
+                    <Label className="text-base font-semibold">Produit parent (gros conditionnement)</Label>
+                    <p className="text-xs text-gray-500 mb-2">Sélectionnez le produit en gros dont cet article est issu</p>
+                    <select
+                      value={formData.detailOf}
+                      onChange={(e) => setFormData({ ...formData, detailOf: e.target.value })}
+                      className="w-full h-12 text-base rounded-lg border-2 border-gray-200 px-3 bg-white focus:border-indigo-400 focus:outline-none"
+                    >
+                      <option value="">— Choisir le produit parent —</option>
+                      {medicines
+                        .filter(m => m.packagingType === 'bulk' && m.id !== editingMedicine?.id)
+                        .map(m => (
+                          <option key={m.id} value={m.id}>
+                            {m.name} ({m.quantity} unités en stock)
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <Label className="text-base font-semibold">Unités de base par article détail</Label>
+                      <p className="text-xs text-gray-500 mb-2">Ex : 10 (gélules par plaquette)</p>
+                      <Input
+                        type="number" min="1"
+                        value={formData.detailSize || ''}
+                        onChange={(e) => setFormData({ ...formData, detailSize: parseInt(e.target.value) || 0 })}
+                        placeholder="10"
+                        className="h-12 text-base"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-base font-semibold">Libellé de l'article</Label>
+                      <p className="text-xs text-gray-500 mb-2">Ex : plaquette, tube, sachet</p>
+                      <Input
+                        value={formData.detailLabel}
+                        onChange={(e) => setFormData({ ...formData, detailLabel: e.target.value })}
+                        placeholder="plaquette"
+                        className="h-12 text-base"
+                      />
+                    </div>
+                  </div>
+                  {formData.detailOf && formData.detailSize > 0 && (() => {
+                    const parent = medicines.find(m => m.id === formData.detailOf);
+                    if (!parent) return null;
+                    const computed = Math.floor(parent.quantity / formData.detailSize);
+                    return (
+                      <div className="bg-indigo-100 rounded-lg px-4 py-3 text-sm text-indigo-800">
+                        Stock calculé automatiquement : <strong>{computed} {formData.detailLabel || 'unités'}</strong>
+                        {' '}(sur {parent.quantity} unités dans «{parent.name}»)
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
             </motion.div>
 
             {/* ── Section 2 : Stock et traçabilité ── */}
@@ -363,13 +548,34 @@ export function MedicinesView({ currentUser }: MedicinesViewProps) {
                   />
                 </div>
                 <div>
-                  <Label className="text-base font-semibold">Quantité en stock</Label>
-                  <Input
-                    type="number"
-                    value={formData.quantity}
-                    onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })}
-                    className="mt-2 h-12 text-base"
-                  />
+                  {formData.packagingType === 'detail' ? (
+                    <>
+                      <Label className="text-base font-semibold text-indigo-700">Quantité (auto)</Label>
+                      <div className="mt-2 h-12 flex items-center px-4 rounded-lg bg-indigo-50 border-2 border-indigo-200 text-indigo-700 font-medium text-base">
+                        Calculée depuis le parent
+                      </div>
+                      <p className="text-xs text-indigo-500 mt-1">Dérivée du stock du gros conditionnement</p>
+                    </>
+                  ) : (
+                    <>
+                      <Label className="text-base font-semibold">
+                        {formData.packagingType === 'bulk'
+                          ? `Quantité en stock (unités de base)`
+                          : 'Quantité en stock'}
+                      </Label>
+                      <Input
+                        type="number"
+                        value={formData.quantity}
+                        onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })}
+                        className="mt-2 h-12 text-base"
+                      />
+                      {formData.packagingType === 'bulk' && formData.packSize > 0 && (
+                        <p className="text-xs text-orange-600 mt-1">
+                          ≈ {(formData.quantity / formData.packSize).toFixed(1)} {formData.packLabel || 'colis'}
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -388,86 +594,98 @@ export function MedicinesView({ currentUser }: MedicinesViewProps) {
                 Gestion des prix et marges
               </h3>
 
-              {/* Toggle */}
-              <div className="mb-6">
-                <Label className="mb-2 block text-base font-semibold">Base de calcul du prix de vente</Label>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setUseWholesale(true)}
-                    className={`flex-1 py-2.5 rounded-lg border-2 font-semibold text-sm transition-all ${
-                      useWholesale
-                        ? 'border-teal-600 bg-teal-600 text-white'
-                        : 'border-gray-200 bg-white text-gray-700 hover:border-teal-300'
-                    }`}
-                  >
-                    Prix d'achat en gros
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setUseWholesale(false)}
-                    className={`flex-1 py-2.5 rounded-lg border-2 font-semibold text-sm transition-all ${
-                      !useWholesale
-                        ? 'border-teal-600 bg-teal-600 text-white'
-                        : 'border-gray-200 bg-white text-gray-700 hover:border-teal-300'
-                    }`}
-                  >
-                    Prix d'achat au détail
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-6">
-                <div className={useWholesale ? '' : 'opacity-40 pointer-events-none'}>
+              {/* Prix d'achat */}
+              <div className="grid grid-cols-2 gap-6 mb-4">
+                <div>
                   <Label className="text-base font-semibold">Prix d'achat en gros (FCFA)</Label>
                   <Input
-                    type="number" step="0.01"
+                    type="number" step="1" min="0"
                     value={formData.purchasePriceWholesale}
                     onChange={(e) => setFormData({ ...formData, purchasePriceWholesale: parseFloat(e.target.value) || 0 })}
                     className="mt-2 h-12 text-base"
                   />
                 </div>
-                <div className={!useWholesale ? '' : 'opacity-40 pointer-events-none'}>
+                <div>
                   <Label className="text-base font-semibold">Prix d'achat au détail (FCFA)</Label>
                   <Input
-                    type="number" step="0.01"
+                    type="number" step="1" min="0"
                     value={formData.purchasePriceDetail}
                     onChange={(e) => setFormData({ ...formData, purchasePriceDetail: parseFloat(e.target.value) || 0 })}
                     className="mt-2 h-12 text-base"
                   />
                 </div>
+              </div>
+
+              {/* Base de calcul */}
+              <div className="mb-6">
+                <Label className="mb-2 block text-sm font-semibold text-gray-600">Base utilisée pour le calcul du prix de vente</Label>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setUseWholesale(true)}
+                    className={`flex-1 py-2 rounded-lg border-2 font-medium text-sm transition-all ${
+                      useWholesale
+                        ? 'border-teal-600 bg-teal-600 text-white'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-teal-300'
+                    }`}
+                  >
+                    Utiliser le prix gros
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUseWholesale(false)}
+                    className={`flex-1 py-2 rounded-lg border-2 font-medium text-sm transition-all ${
+                      !useWholesale
+                        ? 'border-teal-600 bg-teal-600 text-white'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-teal-300'
+                    }`}
+                  >
+                    Utiliser le prix détail
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <Label className="text-base font-semibold">Coefficient de marge</Label>
-                  <div className="flex gap-3 mt-2">
-                    <Input
-                      type="number" step="0.1" min="1"
-                      value={formData.profitMargin}
-                      onChange={(e) => setFormData({ ...formData, profitMargin: parseFloat(e.target.value) || 1 })}
-                      className="h-12 text-base"
-                    />
+                  <Label className="text-base font-semibold">Marge bénéficiaire (%)</Label>
+                  <div className="flex gap-3 mt-2 items-center">
+                    <div className="relative flex-1">
+                      <Input
+                        type="number" step="1" min="0" max="500"
+                        value={formData.profitMarginPct}
+                        onChange={(e) => setFormData({ ...formData, profitMarginPct: parseFloat(e.target.value) || 0 })}
+                        className="h-12 text-base pr-10"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-semibold text-sm">%</span>
+                    </div>
                     <Button
                       type="button" variant="outline"
-                      onClick={() => setFormData({ ...formData, profitMargin: 1.5 })}
-                      className="whitespace-nowrap h-12 px-4 text-sm"
+                      onClick={() => setFormData({ ...formData, profitMarginPct: 50 })}
+                      className="whitespace-nowrap h-12 px-4 text-sm shrink-0"
                     >
-                      Défaut (1.5)
+                      Défaut (50%)
                     </Button>
                   </div>
-                  <p className="text-sm text-gray-400 mt-1.5">Suggestion : 1.3 à 2.0 selon le médicament</p>
+                  <p className="text-sm text-gray-400 mt-1.5">
+                    Prix vente = Prix achat × (1 + marge / 100)
+                  </p>
                 </div>
                 <div>
                   <Label className="text-base font-semibold">Taux de taxe (%)</Label>
-                  <div className="flex gap-3 mt-2">
-                    <Input
-                      type="number" step="0.1" min="0" max="100"
-                      value={formData.taxRate}
-                      onChange={(e) => setFormData({ ...formData, taxRate: parseFloat(e.target.value) || 0 })}
-                      className="h-12 text-base"
-                    />
+                  <div className="flex gap-3 mt-2 items-center">
+                    <div className="relative flex-1">
+                      <Input
+                        type="number" step="0.1" min="0" max="100"
+                        value={formData.taxRate}
+                        onChange={(e) => setFormData({ ...formData, taxRate: parseFloat(e.target.value) || 0 })}
+                        className="h-12 text-base pr-10"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-semibold text-sm">%</span>
+                    </div>
                     <Button
                       type="button" variant="outline"
                       onClick={() => setFormData({ ...formData, taxRate: 0 })}
-                      className="whitespace-nowrap h-12 px-4 text-sm"
+                      className="whitespace-nowrap h-12 px-4 text-sm shrink-0"
                     >
                       0% (Exonéré)
                     </Button>
@@ -489,7 +707,7 @@ export function MedicinesView({ currentUser }: MedicinesViewProps) {
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-1.5">
-                    <span className="text-sm text-gray-600">Marge (×{formData.profitMargin}) :</span>
+                    <span className="text-sm text-gray-600">Marge ({formData.profitMarginPct}%) :</span>
                     <span className="text-sm font-semibold text-teal-700">
                       +{profitAmount.toLocaleString('fr-FR')} FCFA
                     </span>
@@ -520,10 +738,10 @@ export function MedicinesView({ currentUser }: MedicinesViewProps) {
                     <span className="text-sm font-semibold text-gray-700">Bénéfice unitaire :</span>
                     <div className="text-right">
                       <div className="text-base font-bold text-teal-700">
-                        {profitAmount.toLocaleString('fr-FR')} FCFA
+                        +{profitAmount.toLocaleString('fr-FR')} FCFA
                       </div>
                       <div className="text-xs text-gray-400">
-                        {profitPercentage.toFixed(1)}% de marge
+                        {formData.profitMarginPct}% de marge
                       </div>
                     </div>
                   </div>
@@ -725,7 +943,23 @@ export function MedicinesView({ currentUser }: MedicinesViewProps) {
                             <Package className="w-5 h-5 text-teal-600" />
                           </div>
                           <div>
-                            <p className="font-medium text-gray-900">{medicine.name}</p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium text-gray-900">{medicine.name}</p>
+                              {medicine.packagingType === 'bulk' && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
+                                  <Boxes className="w-3 h-3" />
+                                  {medicine.packLabel || 'Gros cond.'}
+                                  {medicine.packSize ? ` ×${medicine.packSize}` : ''}
+                                </span>
+                              )}
+                              {medicine.packagingType === 'detail' && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
+                                  <Layers className="w-3 h-3" />
+                                  {medicine.detailLabel || 'Détail'}
+                                  {medicine.detailSize ? ` ×${medicine.detailSize}` : ''}
+                                </span>
+                              )}
+                            </div>
                             {medicine.moleculeName && (
                               <p className="text-xs text-purple-600 flex items-center gap-0.5">
                                 <FlaskConical className="w-3 h-3" />{medicine.moleculeName}
@@ -741,10 +975,22 @@ export function MedicinesView({ currentUser }: MedicinesViewProps) {
                       <td className="px-6 py-4 text-sm text-gray-700">{medicine.batchNumber || '-'}</td>
                       <td className="px-6 py-4 text-sm text-gray-700">{medicine.expirationDate || '-'}</td>
                       <td className="px-6 py-4">
-                        <span className={`text-sm font-medium ${medicine.quantity < 0 ? 'text-red-600' : medicine.quantity < 20 ? 'text-orange-600' : 'text-gray-900'}`}>
-                          {medicine.quantity}
-                          {medicine.quantity < 0 && <span className="ml-1 text-xs text-red-500">⚠</span>}
-                        </span>
+                        <div>
+                          <span className={`text-sm font-medium ${medicine.quantity < 0 ? 'text-red-600' : medicine.quantity < 20 ? 'text-orange-600' : 'text-gray-900'}`}>
+                            {medicine.quantity}
+                            {medicine.packagingType === 'detail' && medicine.detailLabel
+                              ? ` ${medicine.detailLabel}s`
+                              : medicine.packagingType === 'bulk'
+                              ? ' unités'
+                              : ''}
+                            {medicine.quantity < 0 && <span className="ml-1 text-xs text-red-500">⚠</span>}
+                          </span>
+                          {medicine.packagingType === 'bulk' && medicine.packSize && medicine.packSize > 0 && (
+                            <p className="text-xs text-orange-500">
+                              ≈ {(medicine.quantity / medicine.packSize).toFixed(1)} {medicine.packLabel || 'colis'}
+                            </p>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">
                         {medicine.price.toLocaleString('fr-FR')} F

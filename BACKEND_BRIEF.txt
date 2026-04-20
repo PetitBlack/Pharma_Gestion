@@ -1,0 +1,486 @@
+================================================================================
+                     BRIEF BACKEND — PHARMAA GEST (Node.js)
+================================================================================
+
+STACK FRONTEND EXISTANTE
+--------------------------
+- React + TypeScript + Vite
+- Données actuellement en mémoire (in-memory singleton) ou localStorage
+- Communication future : API REST JSON via fetch/axios
+
+
+================================================================================
+MODÈLES DE DONNÉES (à transformer en tables/collections)
+================================================================================
+
+── users ──────────────────────────────────────────────────────────────────────
+id
+username
+password (hashé bcrypt)
+fullName
+email
+role                  : 'Admin' | 'Employee' | 'Auxiliaire' | 'Caisse'
+workstation           : string (optionnel)
+allowedModules        : string[] (optionnel — modules visibles pour ce user)
+createdAt
+
+── medicines ───────────────────────────────────────────────────────────────────
+id
+name
+moleculeName          : string (optionnel — principe actif / DCI)
+brandName             : string (optionnel)
+category
+batchNumber
+expirationDate
+quantity              : number (peut être négatif)
+price
+status                : 'OK' | 'Low' | 'Expiring' | 'Expired' | 'Negative'
+description           : string (optionnel)
+manufacturer          : string (optionnel)
+location              : string (optionnel — ex: Rayon A - Étagère 2)
+requiresPrescription  : boolean (optionnel)
+minStock              : number (optionnel — seuil alerte commande)
+purchasePriceWholesale: number (optionnel)
+purchasePriceDetail   : number (optionnel)
+profitMarginPct       : number (optionnel — en %)
+sellingPrice          : number (optionnel)
+taxRate               : number (optionnel — en %)
+finalPrice            : number (optionnel — prix TTC)
+-- Conditionnement --
+packagingType         : 'standard' | 'bulk' | 'detail' (optionnel)
+packSize              : number (optionnel — unités de base par colis bulk)
+packLabel             : string (optionnel — ex: "boîte")
+detailOf              : string (FK → medicine.id — pour articles détail)
+detailSize            : number (optionnel — unités de base par unité détail)
+detailLabel           : string (optionnel — ex: "plaquette")
+
+── orders (commandes point de vente) ──────────────────────────────────────────
+id
+orderNumber           : string (ex: ORD-2024-0001)
+auxiliaryId           : FK → users.id
+auxiliaryName         : string
+workstation           : string
+items                 : [
+  {
+    medicineId        : string,
+    medicineName      : string,
+    quantity          : number,
+    price             : number,
+    total             : number,
+    discount          : number (optionnel — remise en %),
+    prescriptionId    : string (optionnel)
+  }
+]
+total
+status                : 'En attente' | 'Payée' | 'Annulée'
+paymentMethod         : 'Espèces' | 'Mobile Money' | 'Autre' (optionnel)
+createdAt
+paidAt                : datetime (optionnel)
+cashierId             : FK → users.id (optionnel)
+cashierName           : string (optionnel)
+insuranceCompany      : string (optionnel)
+insuranceCoverage     : number (optionnel — montant pris en charge)
+cancelledBy           : string (optionnel)
+cancelledAt           : datetime (optionnel)
+cancellationReason    : string (optionnel)
+
+── clients ─────────────────────────────────────────────────────────────────────
+id
+firstName
+lastName
+fullName
+email                 : string (optionnel)
+phone
+address               : string (optionnel)
+city                  : string (optionnel)
+dateOfBirth           : date (optionnel)
+gender                : 'Homme' | 'Femme' | 'Autre' (optionnel)
+isInsured             : boolean
+insurance             : {
+  company             : string,
+  policyNumber        : string,
+  coveragePercentage  : number,
+  expiryDate          : date (optionnel),
+  cardNumber          : string (optionnel)
+} (optionnel)
+allergies             : string[] (optionnel)
+chronicDiseases       : string[] (optionnel)
+notes                 : string (optionnel)
+prescriber            : {
+  name                : string,
+  specialty           : string (optionnel),
+  phone               : string (optionnel),
+  email               : string (optionnel),
+  registrationNumber  : string (optionnel),
+  clinicName          : string (optionnel),
+  address             : string (optionnel)
+} (optionnel)
+totalPurchases        : number
+totalSpent            : number
+lastVisit             : date (optionnel)
+creditBalance         : number (optionnel — avoir en FCFA)
+creditAlertThreshold  : number (optionnel)
+createdAt
+updatedAt
+createdBy             : string (optionnel)
+status                : 'Actif' | 'Inactif'
+
+── suppliers (fournisseurs) ────────────────────────────────────────────────────
+id
+name
+companyName
+email
+phone
+address
+city
+country
+taxId                 : string (optionnel — numéro fiscal / IFU)
+paymentTerms          : string (ex: "30 jours", "À la livraison")
+category              : string[] (catégories de produits fournis)
+status                : 'Actif' | 'Inactif' | 'Suspendu'
+rating                : number (1 à 5)
+notes                 : string (optionnel)
+createdAt
+updatedAt
+
+── supplier_orders (commandes fournisseurs) ────────────────────────────────────
+id
+supplierId            : FK → suppliers.id
+supplierName          : string
+orderNumber           : string
+orderDate
+deliveryDate          : date (optionnel)
+status                : 'En attente' | 'Commandé' | 'Livré' | 'Annulé'
+items                 : [
+  {
+    medicineId        : string,
+    medicineName      : string,
+    quantity          : number,
+    unitPrice         : number,
+    total             : number
+  }
+]
+subtotal
+tax
+total
+notes                 : string (optionnel)
+createdBy             : FK → users.id
+createdAt
+
+── bons_livraison ──────────────────────────────────────────────────────────────
+id
+blNumber              : string (ex: BL-2024-001)
+supplierOrderId       : string (optionnel)
+supplierOrderNumber   : string (optionnel)
+supplierId            : FK → suppliers.id
+supplierName          : string
+orderDate             : date (optionnel)
+deliveryDate
+createdAt
+items                 : [
+  {
+    medicineId        : string,
+    medicineName      : string,
+    quantityOrdered   : number,
+    quantityReceived  : number,
+    unitPrice         : number,
+    sellingPrice      : number (optionnel),
+    taxRate           : number (optionnel),
+    taxAmount         : number (optionnel),
+    batchNumber       : string (optionnel),
+    expirationDate    : date (optionnel),
+    discrepancy       : number (optionnel),
+    priceChanged      : boolean (optionnel),
+    previousSellingPrice: number (optionnel),
+    currentStock      : number (optionnel)
+  }
+]
+subtotal
+tax
+totalAmount
+status                : 'En attente' | 'Vérifié' | 'Validé' | 'Litige' | 'Archivé'
+hasDiscrepancies      : boolean
+discrepancyNotes      : string (optionnel)
+deliveryPerson        : string (optionnel)
+verifiedBy            : string (optionnel)
+verifiedAt            : datetime (optionnel)
+validatedBy           : string (optionnel)
+validatedAt           : datetime (optionnel)
+notes                 : string (optionnel)
+
+── retours_fournisseur ─────────────────────────────────────────────────────────
+id
+retourNumber          : string
+blId                  : string (optionnel — FK → bons_livraison)
+blNumber              : string (optionnel)
+supplierId            : string (optionnel)
+supplierName
+returnDate
+createdAt
+items                 : [
+  {
+    medicineId        : string,
+    medicineName      : string,
+    quantity          : number,
+    unitPrice         : number,
+    reason            : 'Périmé' | 'Endommagé' | 'Erreur de commande' | 'Qualité insuffisante' | 'Autre',
+    batchNumber       : string (optionnel),
+    totalAmount       : number,
+    notes             : string (optionnel)
+  }
+]
+totalAmount
+status                : 'En attente' | 'Envoyé' | 'Accepté' | 'Refusé'
+notes                 : string (optionnel)
+createdBy             : string (optionnel)
+
+── inventories ─────────────────────────────────────────────────────────────────
+id
+inventoryNumber       : string (ex: INV-2024-0001)
+name
+year                  : number
+startDate
+endDate               : date (optionnel)
+status                : 'En cours' | 'Terminé' | 'Validé'
+items                 : [
+  {
+    medicineId        : string,
+    medicineName      : string,
+    category          : string,
+    location          : string (optionnel),
+    systemQty         : number (snapshot au moment de la création),
+    physicalQty       : number (optionnel — compté physiquement),
+    discrepancy       : number (optionnel — physicalQty - systemQty),
+    unitPrice         : number,
+    batchNumber       : string,
+    expirationDate    : string,
+    countedBy         : string (optionnel),
+    countedAt         : datetime (optionnel),
+    notes             : string (optionnel)
+  }
+]
+createdBy             : FK → users.id
+validatedBy           : string (optionnel)
+validatedAt           : datetime (optionnel)
+notes                 : string (optionnel)
+totalItems            : number
+countedItems          : number
+discrepanciesCount    : number
+totalSystemValue      : number
+totalPhysicalValue    : number
+
+── prescriptions (ordonnancier) ────────────────────────────────────────────────
+id
+patientName
+doctorName
+doctorRegistration    : string (optionnel — numéro RPPS / ordre)
+prescriptionNumber    : string (optionnel)
+prescriptionDate
+deliveredAt
+medicines             : [
+  {
+    medicineId        : string,
+    medicineName      : string,
+    quantity          : number,
+    dosage            : string (optionnel)
+  }
+]
+auxiliaryId           : FK → users.id
+auxiliaryName         : string
+orderId               : FK → orders.id (optionnel)
+notes                 : string (optionnel)
+
+── activity_logs ───────────────────────────────────────────────────────────────
+id
+action                : 'medicine_add' | 'medicine_edit' | 'medicine_delete' |
+                        'medicine_price_change' | 'stock_adjust' | 'sale_create' |
+                        'user_add' | 'user_edit' | 'user_delete' | 'login'
+timestamp
+userId                : FK → users.id
+userName              : string
+userRole              : string
+targetId              : string (optionnel — ID de la ressource ciblée)
+targetName            : string (optionnel — nom lisible)
+detail                : string (optionnel — description de l'action)
+before                : JSON (optionnel — valeurs avant modification)
+after                 : JSON (optionnel — valeurs après modification)
+
+── settings (1 seule ligne par pharmacie) ──────────────────────────────────────
+pharmacyName
+address
+city
+phone
+email
+license
+openingHours
+lowStockThreshold     : number
+expiryAlertDays       : number
+currency              : string (ex: "FCFA")
+defaultMarginPct      : number (ex: 50)
+backupEnabled         : boolean
+backupFrequency       : 'Quotidien' | 'Hebdomadaire' | 'Mensuel'
+
+
+================================================================================
+ROUTES API À IMPLÉMENTER
+================================================================================
+
+AUTH
+  POST   /auth/login                      Login → retourne JWT
+  POST   /auth/logout                     Invalider token
+  POST   /auth/refresh                    Rafraîchir access token
+
+USERS
+  GET    /users                           Liste tous les utilisateurs (Admin)
+  POST   /users                           Créer un utilisateur (Admin)
+  PUT    /users/:id                       Modifier un utilisateur (Admin)
+  DELETE /users/:id                       Supprimer (Admin)
+  GET    /users/:id/activity              Journal d'activité d'un utilisateur
+  GET    /users/:id/orders                Commandes liées à un utilisateur
+
+MEDICINES
+  GET    /medicines                       Liste médicaments
+  GET    /medicines/:id                   Détail d'un médicament
+  POST   /medicines                       Créer
+  PUT    /medicines/:id                   Modifier
+  DELETE /medicines/:id                   Supprimer
+  PATCH  /medicines/:id/quantity          Ajuster le stock manuellement
+  GET    /medicines/low-stock             Médicaments en stock bas
+  GET    /medicines/expiring              Médicaments bientôt périmés
+
+ORDERS (point de vente)
+  GET    /orders                          Toutes les commandes (filtres: status, période, user)
+  GET    /orders/:id                      Détail d'une commande
+  POST   /orders                          Créer une commande (déduit stock auto)
+  PATCH  /orders/:id/pay                  Encaisser (cashierId, paymentMethod)
+  PATCH  /orders/:id/cancel              Annuler (raison)
+
+CLIENTS
+  GET    /clients                         Liste clients
+  GET    /clients/:id                     Détail client
+  POST   /clients                         Créer
+  PUT    /clients/:id                     Modifier
+  DELETE /clients/:id                     Supprimer
+  GET    /clients/:id/purchases           Historique achats d'un client
+
+SUPPLIERS (fournisseurs)
+  GET    /suppliers                       Liste fournisseurs
+  GET    /suppliers/:id                   Détail fournisseur
+  POST   /suppliers                       Créer
+  PUT    /suppliers/:id                   Modifier
+  DELETE /suppliers/:id                   Supprimer
+  GET    /suppliers/:id/orders            Commandes passées à ce fournisseur
+
+SUPPLIER ORDERS
+  GET    /supplier-orders                 Liste commandes fournisseurs
+  POST   /supplier-orders                 Créer une commande fournisseur
+  PUT    /supplier-orders/:id             Modifier
+  PATCH  /supplier-orders/:id/status      Changer le statut
+
+BONS DE LIVRAISON
+  GET    /bons-livraison                  Liste BL
+  GET    /bons-livraison/:id              Détail BL
+  POST   /bons-livraison                  Créer BL
+  PATCH  /bons-livraison/:id/verify       Marquer vérifié
+  PATCH  /bons-livraison/:id/validate     Valider (met à jour le stock auto)
+  GET    /bons-livraison/:id/retours      Retours liés à ce BL
+
+RETOURS FOURNISSEUR
+  GET    /retours                         Liste retours
+  POST   /retours                         Créer un retour
+  PATCH  /retours/:id/status              Changer statut
+
+INVENTAIRES
+  GET    /inventories                     Liste inventaires
+  GET    /inventories/:id                 Détail inventaire
+  POST   /inventories                     Créer (snapshot stock auto)
+  PATCH  /inventories/:id/items/:itemId   Saisir quantité physique
+  PATCH  /inventories/:id/validate        Valider (corrige les écarts de stock)
+
+PRESCRIPTIONS
+  GET    /prescriptions                   Ordonnancier complet
+  GET    /prescriptions/:id               Détail ordonnance
+  POST   /prescriptions                   Enregistrer une ordonnance
+  PUT    /prescriptions/:id               Modifier
+
+ACTIVITY LOGS
+  GET    /activity-logs                   Journal global (Admin)
+  GET    /activity-logs/user/:userId      Journal d'un utilisateur
+
+SETTINGS
+  GET    /settings                        Lire les paramètres
+  PUT    /settings                        Mettre à jour
+
+DASHBOARD
+  GET    /dashboard/stats                 KPIs globaux (CA, ventes, stock...)
+  GET    /dashboard/top-medicines         Top médicaments vendus
+  GET    /dashboard/top-sellers           Top vendeurs
+
+
+================================================================================
+POINTS TECHNIQUES IMPORTANTS
+================================================================================
+
+1. AUTHENTIFICATION
+   - JWT : access token (15min) + refresh token (7j)
+   - Middleware requireAuth sur toutes les routes protégées
+   - Middleware requireAdmin pour les routes Admin uniquement
+   - Stocker refresh token en httpOnly cookie ou en base
+
+2. LOGIQUE STOCK CONDITIONNÉ (bulk / detail)
+   - Article packagingType='detail' : pas de qty stockée propre
+   - À chaque vente d'un article detail, déduire (quantity × detailSize)
+     du stock du parent bulk en transaction atomique
+   - getAll() medicines : calculer la qty virtuelle des articles detail
+     = Math.floor(parentQty / detailSize)
+
+3. VALIDATION BON DE LIVRAISON
+   - À la validation (status → 'Validé'), mettre à jour automatiquement
+     le stock de chaque médicament avec quantityReceived
+   - Si batchNumber ou expirationDate fournis → les mettre à jour sur le médicament
+
+4. VALIDATION INVENTAIRE
+   - À la validation, pour chaque item avec discrepancy ≠ 0 :
+     ajuster medicines.quantity = physicalQty (correction de stock)
+   - Logger l'ajustement dans activity_logs (action: 'stock_adjust')
+
+5. ACTIVITY LOGS AUTOMATIQUES
+   - Middleware post-action qui enregistre les opérations critiques
+     (création/modification/suppression médicament, ventes, login...)
+   - Stocker before/after pour les modifications de prix et stock
+
+6. NUMÉROTATION AUTO
+   - orderNumber   : ORD-YYYY-NNNN (auto-incrémenté par année)
+   - blNumber      : BL-YYYY-NNNN
+   - retourNumber  : RET-YYYY-NNNN
+   - inventoryNumber: INV-YYYY-NNNN
+
+7. BASE DE DONNÉES RECOMMANDÉE
+   - PostgreSQL + Prisma ORM  (relations claires, transactions fiables)
+   - OU MongoDB + Mongoose    (schémas flexibles pour items imbriqués)
+   → Préciser ton choix dans la conversation backend
+
+8. STACK NODE SUGGÉRÉE
+   - Runtime  : Node.js 20+
+   - Framework: Express.js ou Fastify
+   - Auth     : jsonwebtoken + bcrypt
+   - Validation: Zod ou Joi
+   - ORM      : Prisma (PostgreSQL) ou Mongoose (MongoDB)
+
+
+================================================================================
+NOTE POUR LA CONVERSATION BACKEND
+================================================================================
+
+Précise dans ta nouvelle conversation :
+  - Le choix de base de données : PostgreSQL ou MongoDB
+  - Le choix d'ORM : Prisma / Mongoose / raw SQL
+  - Si tu veux Docker (docker-compose avec la DB incluse)
+  - Si tu veux les tests unitaires inclus (Jest)
+  - Le port cible du serveur (défaut: 3001)
+
+Le frontend React tournera sur http://localhost:5173
+Le backend Node tournera sur http://localhost:3001
+Penser à configurer CORS en conséquence.
+
+================================================================================

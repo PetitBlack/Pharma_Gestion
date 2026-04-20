@@ -12,8 +12,12 @@ import {
   User2Icon,
   Package,
   BookOpen,
+  ListOrdered,
+  UserCircle,
+  ChevronDown,
 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import type { User } from '@/models/User';
 import logoSrc from '@/app/assets/Logo.png';
 
@@ -32,6 +36,7 @@ interface AppModule {
 }
 
 export function HomeView({ currentUser, onNavigate, onLogout }: HomeViewProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const allModules: AppModule[] = [
     { id: 'dashboard',     label: 'Tableau de bord',   icon: LayoutDashboard, color: 'bg-blue-500',    roles: ['Admin', 'Employee'] },
     { id: 'medicines',     label: 'Médicaments',        icon: Pill,            color: 'bg-teal-500',    roles: ['Admin', 'Employee'] },
@@ -42,7 +47,8 @@ export function HomeView({ currentUser, onNavigate, onLogout }: HomeViewProps) {
     { id: 'caisse',        label: 'Caisse',             icon: CreditCard,      color: 'bg-pink-500',    roles: ['Admin', 'Caisse'] },
     { id: 'alerts',        label: 'Alertes Stock',      icon: AlertTriangle,   color: 'bg-red-500',     roles: ['Admin', 'Employee'] },
     { id: 'bonsLivraison',    label: 'Bons de Livraison',      icon: ClipboardList, color: 'bg-emerald-500', roles: ['Admin'] },
-    { id: 'inventory',     label: 'Inventaires',         icon: BookOpen,        color: 'bg-indigo-500',  roles: ['Admin'] },
+    { id: 'orderSuggestions', label: 'Suggestions commande', icon: ListOrdered,   color: 'bg-violet-500',  roles: ['Admin'] },
+    { id: 'inventory',     label: 'Inventaires',           icon: BookOpen,        color: 'bg-indigo-500',  roles: ['Admin'] },
     { id: 'users',         label: 'Utilisateurs',        icon: Users,           color: 'bg-cyan-500',    roles: ['Admin'] },
     { id: 'settings',      label: 'Paramètres',         icon: Settings,        color: 'bg-gray-500',    roles: ['Admin'] },
   ];
@@ -78,37 +84,81 @@ export function HomeView({ currentUser, onNavigate, onLogout }: HomeViewProps) {
           </span>
         </div>
 
-        {/* User + logout */}
-        <div className="flex items-center gap-3 flex-1 justify-end">
-          {/* Avatar + infos */}
-          <div className="flex items-center gap-2.5">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 ${
-              currentUser?.role === 'Admin'      ? 'bg-purple-500' :
-              currentUser?.role === 'Employee'   ? 'bg-blue-500'   :
-              currentUser?.role === 'Auxiliaire' ? 'bg-indigo-500' :
-              currentUser?.role === 'Caisse'     ? 'bg-pink-500'   : 'bg-gray-400'
-            }`}>
-              {currentUser?.fullName?.charAt(0).toUpperCase()}
-            </div>
-            <div className="hidden sm:block text-right">
-              <p className="text-sm font-semibold text-gray-800 leading-none">{currentUser?.fullName}</p>
-              <span className={`inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full ${roleColor[currentUser?.role ?? ''] ?? 'bg-gray-100 text-gray-600'}`}>
-                {currentUser?.role}
-              </span>
-            </div>
+        {/* Menu utilisateur */}
+        <div className="flex items-center flex-1 justify-end">
+          <div className="relative">
+            {/* Bouton déclencheur */}
+            <button
+              onClick={() => setMenuOpen(v => !v)}
+              className={`flex items-center gap-2.5 px-3 py-1.5 rounded-xl transition-all border ${
+                menuOpen
+                  ? 'bg-gray-100 border-gray-300'
+                  : 'border-transparent hover:bg-gray-50 hover:border-gray-200'
+              }`}
+            >
+              {/* Avatar */}
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 ${
+                currentUser?.role === 'Admin'      ? 'bg-purple-500' :
+                currentUser?.role === 'Employee'   ? 'bg-blue-500'   :
+                currentUser?.role === 'Auxiliaire' ? 'bg-indigo-500' :
+                currentUser?.role === 'Caisse'     ? 'bg-pink-500'   : 'bg-gray-400'
+              }`}>
+                {currentUser?.fullName?.charAt(0).toUpperCase()}
+              </div>
+              <div className="hidden sm:block text-left">
+                <p className="text-sm font-semibold text-gray-800 leading-none">{currentUser?.fullName}</p>
+                <span className={`inline-block mt-0.5 text-xs font-medium px-2 py-0.5 rounded-full ${roleColor[currentUser?.role ?? ''] ?? 'bg-gray-100 text-gray-600'}`}>
+                  {currentUser?.role}
+                </span>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${menuOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Dropdown */}
+            <AnimatePresence>
+              {menuOpen && (
+                <>
+                  {/* Overlay pour fermer en cliquant ailleurs */}
+                  <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+
+                  <motion.div
+                    initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl border border-gray-200 shadow-lg z-20 overflow-hidden"
+                  >
+                    {/* En-tête */}
+                    <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                      <p className="text-sm font-semibold text-gray-900">{currentUser?.fullName}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{currentUser?.email || currentUser?.username}</p>
+                    </div>
+
+                    {/* Items */}
+                    <div className="p-1.5">
+                      <button
+                        onClick={() => { setMenuOpen(false); onNavigate('userSpace'); }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700 transition-colors"
+                      >
+                        <UserCircle className="w-4 h-4 text-teal-600 shrink-0" />
+                        Mon espace
+                      </button>
+                    </div>
+
+                    <div className="border-t border-gray-100 p-1.5">
+                      <button
+                        onClick={() => { setMenuOpen(false); onLogout(); }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <LogOut className="w-4 h-4 shrink-0" />
+                        Déconnexion
+                      </button>
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
-
-          {/* Séparateur */}
-          <div className="w-px h-6 bg-gray-200" />
-
-          {/* Bouton déconnexion */}
-          <button
-            onClick={onLogout}
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-600 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-50 border border-transparent hover:border-red-100"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="hidden sm:inline">Déconnexion</span>
-          </button>
         </div>
       </header>
 

@@ -16,6 +16,10 @@ import { UsersView } from '@/views/UsersView';
 import { Sidebar } from './components/Sidebar';
 import { BonLivraisonView } from '@/views/bonLivraisonView';
 import { InventoryView } from '@/views/InventoryView';
+import { SettingsView } from '@/views/SettingsView';
+import { AlertsView } from '@/views/AlertsView';
+import { OrderSuggestionsView } from '@/views/OrderSuggestionsView';
+import { UserSpaceView } from '@/views/UserSpaceView';
 
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -48,6 +52,28 @@ function App() {
             transition={{ duration: 0.35 }}
           >
             <LoginView onLogin={handleLogin} />
+          </motion.div>
+        </AnimatePresence>
+        <Toaster position="top-right" />
+      </>
+    );
+  }
+
+  // Espace utilisateur — sans sidebar, avec back vers accueil
+  if (currentPage === 'userSpace') {
+    return (
+      <>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key="userSpace"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: 'easeOut' }}
+          >
+            <UserSpaceView
+              currentUser={currentUser}
+              onBack={() => handleNavigate('home')}
+            />
           </motion.div>
         </AnimatePresence>
         <Toaster position="top-right" />
@@ -97,10 +123,11 @@ function App() {
           {currentPage === 'sales' && <SalesView currentUser={currentUser} />}
           {currentPage === 'auxiliaire' && <AuxiliaireView currentUser={currentUser} />}
           {currentPage === 'caisse' && <CaisseView currentUser={currentUser} />}
-          {currentPage === 'alerts' && <div className="p-8">Page Alertes (à implémenter)</div>}
+          {currentPage === 'alerts' && <AlertsView />}
+          {currentPage === 'orderSuggestions' && <OrderSuggestionsView />}
           {currentPage === 'inventory' && <InventoryView currentUser={currentUser} />}
           {currentPage === 'users' && <UsersView currentUser={currentUser} />}
-          {currentPage === 'settings' && <div className="p-8">Page Paramètres (à implémenter)</div>}
+          {currentPage === 'settings' && <SettingsView currentUser={currentUser} />}
         </main>
       </div>
       <Toaster position="top-right" />
